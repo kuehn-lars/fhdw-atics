@@ -5,6 +5,7 @@ pydantic
 pydantic-settings
 python-dotenv
 langchain
+langchain-community
 langchain-core
 langchain-openai
 langchain-nvidia-ai-endpoints
