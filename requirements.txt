@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+typer[all]
+pydantic
+pydantic-settings
+python-dotenv
+langchain
+langchain-core
+langchain-openai
+langchain-nvidia-ai-endpoints
+chromadb
+openai
+pytest
+python-multipart

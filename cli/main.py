@@ -1,0 +1,31 @@
+import typer
+from typing import Optional
+from config.settings import settings
+
+from src.rag_system.orchestration.factory import get_rag_pipeline
+
+app = typer.Typer()
+
+@app.command()
+def query(question: str, use_rag: bool = typer.Option(True, help="Toggle RAG on or off")):
+    """
+    Ask a question to the RAG system via CLI.
+    """
+    mode = "RAG" if use_rag else "Direct LLM"
+    typer.echo(f"Querying ({mode}) for: {question}")
+    try:
+        pipeline = get_rag_pipeline()
+        answer = pipeline.query(question, use_rag=use_rag)
+        typer.echo(f"Answer: {answer}")
+    except Exception as e:
+        typer.echo(f"Error: {e}")
+
+@app.command()
+def ingest(source: str):
+    """
+    Ingest a document or directory into the RAG system.
+    """
+    typer.echo(f"Ingesting source: {source}")
+
+if __name__ == "__main__":
+    app()
