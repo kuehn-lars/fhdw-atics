@@ -1,3 +1,4 @@
+import os
 import torch
 import threading
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig, TextIteratorStreamer
