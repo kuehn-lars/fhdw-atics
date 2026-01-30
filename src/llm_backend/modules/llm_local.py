@@ -91,7 +91,12 @@ class HuggingFaceLLM(LLMInterface):
             messages, tokenize=False, add_generation_prompt=True
         )
 
-    def generate(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> str:
+    def generate(
+        self,
+        prompt: str,
+        context: Optional[str] = None,
+        max_new_tokens: int = 512,
+    ) -> str:
         full_prompt = self._get_formatted_prompt(prompt, context)
         results = self.pipe(full_prompt, max_new_tokens=max_new_tokens)
         # Handle cases where the model might repeat the prompt
@@ -100,14 +105,27 @@ class HuggingFaceLLM(LLMInterface):
             return generated[len(full_prompt) :].strip()
         return generated.strip()
 
-    def stream(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> Iterator[str]:
+    def stream(
+        self,
+        prompt: str,
+        context: Optional[str] = None,
+        max_new_tokens: int = 512,
+    ) -> Iterator[str]:
         full_prompt = self._get_formatted_prompt(prompt, context)
-        streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True)
-        
-        inputs = self.tokenizer(full_prompt, return_tensors="pt").to(self.model.device)
-        generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=max_new_tokens)
-        
-        thread = threading.Thread(target=self.model.generate, kwargs=generation_kwargs)
+        streamer = TextIteratorStreamer(
+            self.tokenizer, skip_prompt=True, skip_special_tokens=True
+        )
+
+        inputs = self.tokenizer(full_prompt, return_tensors="pt").to(
+            self.model.device
+        )
+        generation_kwargs = dict(
+            inputs, streamer=streamer, max_new_tokens=max_new_tokens
+        )
+
+        thread = threading.Thread(
+            target=self.model.generate, kwargs=generation_kwargs
+        )
         thread.start()
 
         for new_text in streamer:
@@ -122,19 +140,40 @@ class LocalLLMModule(LLMInterface):
             self.llm = HuggingFaceLLM(model_name)
         else:
             self.llm = Ollama(model=model_name)
-    
-    def generate(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> str:
-        if isinstance(self.llm, Ollama):
-            full_prompt = f"Context: {context}\n\nQuestion: {prompt}" if context else prompt
-            # Note: Ollama doesn't have a direct 'max_new_tokens' parameter in its standard invoke, 
-            # but we can pass it via num_predict
-            return self.llm.invoke(full_prompt, num_predict=max_new_tokens)
-        return self.llm.generate(prompt, context, max_new_tokens=max_new_tokens)
 
-    def stream(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> Iterator[str]:
+    def generate(
+        self,
+        prompt: str,
+        context: Optional[str] = None,
+        max_new_tokens: int = 512,
+    ) -> str:
         if isinstance(self.llm, Ollama):
-            full_prompt = f"Context: {context}\n\nQuestion: {prompt}" if context else prompt
-            for chunk in self.llm.stream(full_prompt, num_predict=max_new_tokens):
+            full_prompt = (
+                f"Context: {context}\n\nQuestion: {prompt}"
+                if context
+                else prompt
+            )
+            # Call Ollama without passing `num_predict` to avoid incompatible client signatures
+            return self.llm.invoke(full_prompt)
+        return self.llm.generate(
+            prompt, context, max_new_tokens=max_new_tokens
+        )
+
+    def stream(
+        self,
+        prompt: str,
+        context: Optional[str] = None,
+        max_new_tokens: int = 512,
+    ) -> Iterator[str]:
+        if isinstance(self.llm, Ollama):
+            full_prompt = (
+                f"Context: {context}\n\nQuestion: {prompt}"
+                if context
+                else prompt
+            )
+            for chunk in self.llm.stream(full_prompt):
                 yield str(chunk)
         else:
-            yield from self.llm.stream(prompt, context, max_new_tokens=max_new_tokens)
+            yield from self.llm.stream(
+                prompt, context, max_new_tokens=max_new_tokens
+            )
