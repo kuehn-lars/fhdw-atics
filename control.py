@@ -70,10 +70,7 @@ if __name__ == "__main__":
     # Example for quick testing
     print("Testing control.py API...")
 
-
     try:
-        # Default behavior (uses config/settings.py)
-        # Note: Will fail if OPENAI_API_KEY is not set and backend is 'api'
         response = query("1+1", use_rag=False)
         print(f"Response: {response}")
     except Exception as e:
