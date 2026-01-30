@@ -7,11 +7,16 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import typer
 from typing import Optional
-from config.settings import settings
-
-from src.rag_system.orchestration.factory import get_rag_pipeline
+import control
 
 app = typer.Typer()
+
+@app.command()
+def setup():
+    """
+    Download/Pull required Ollama models.
+    """
+    control.setup()
 
 @app.command()
 def query(
@@ -26,18 +31,27 @@ def query(
     """
     mode = backend or ("RAG" if use_rag else "Direct LLM")
     typer.echo(f"Querying ({mode}) for: {question}")
+    
     try:
-        pipeline = get_rag_pipeline(backend_mode=backend, model_name=model)
+        response = control.query(
+            question=question, 
+            use_rag=use_rag, 
+            stream=stream, 
+            backend=backend, 
+            model=model
+        )
+        
         if stream:
             typer.echo("Answer: ", nl=False)
-            for chunk in pipeline.stream_query(question, use_rag=use_rag):
+            for chunk in response:
                 typer.echo(chunk, nl=False)
             typer.echo() # Newline at the end
         else:
-            answer = pipeline.query(question, use_rag=use_rag)
-            typer.echo(f"Answer: {answer}")
+            typer.echo(f"Answer: {response}")
+            
     except Exception as e:
         typer.echo(f"Error: {e}")
+
 
 @app.command()
 def ingest(source: str):

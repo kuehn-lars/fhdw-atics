@@ -1,7 +1,40 @@
+import subprocess
+import sys
 from typing import Optional, Iterator, Union
 from src.rag_system.orchestration.factory import get_rag_pipeline
 
-def query_rag(
+def setup():
+    """
+    Sets up the environment by pulling required Ollama models.
+    This replaces the need for a separate bash script.
+    """
+    models = [
+        "qwen2.5:0.5b",
+        "llama3.2:1b",
+        "llama3:8b",
+        "qwen2.5:3b"
+    ]
+    
+    print("------------------------------------------")
+    print("Starting Ollama model setup...")
+    print("------------------------------------------")
+    
+    for model in models:
+        print(f">>> Pulling model: {model}")
+        try:
+            # Run ollama pull and stream the output to the terminal
+            subprocess.run(["ollama", "pull", model], check=True)
+        except subprocess.CalledProcessError:
+            print(f"Error: Could not pull model {model}. Is Ollama running?")
+        except FileNotFoundError:
+            print("Error: 'ollama' command not found. Please install Ollama first.")
+            break
+
+    print("------------------------------------------")
+    print("Ollama setup complete!")
+    print("------------------------------------------")
+
+def query(
     question: str, 
     use_rag: bool = True, 
     stream: bool = False, 
@@ -65,6 +98,8 @@ def query_rag(
 if __name__ == "__main__":
     # Example for quick testing
     print("Testing control.py API...")
+
+
     try:
         # Default behavior (uses config/settings.py)
         # Note: Will fail if OPENAI_API_KEY is not set and backend is 'api'

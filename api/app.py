@@ -1,10 +1,15 @@
+import sys
+from pathlib import Path
+
+# Add project root to sys.path
+sys.path.append(str(Path(__file__).parent.parent))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
+import control
 from config.settings import settings
-
-from src.rag_system.orchestration.factory import get_rag_pipeline
 
 app = FastAPI(title=settings.app_name)
 
@@ -53,16 +58,21 @@ async def query_endpoint(request: QueryRequest):
     - Stream (text/plain): If stream=True.
     """
     try:
-        pipeline = get_rag_pipeline(backend_mode=request.backend, model_name=request.model)
+        response = control.query(
+            question=request.question,
+            use_rag=request.use_rag,
+            stream=request.stream,
+            backend=request.backend,
+            model=request.model
+        )
         
         if request.stream:
             def stream_generator():
-                for chunk in pipeline.stream_query(request.question, use_rag=request.use_rag):
+                for chunk in response:
                     yield chunk
             return StreamingResponse(stream_generator(), media_type="text/plain")
         else:
-            answer = pipeline.query(request.question, use_rag=request.use_rag)
-            return QueryResponse(answer=answer)
+            return QueryResponse(answer=response)
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
