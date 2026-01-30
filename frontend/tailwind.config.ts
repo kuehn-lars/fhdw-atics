@@ -8,16 +8,19 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      colors: {
-        background: "#0D0D0F",
-        surface: "#1A1B1E",
-        muted: "#888B8C",
-        accentCyan: "#448aff",
-        accentPurple: "#8B5CF6",
+      fontFamily: {
+        sans: ['var(--font-geist-sans)', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-geist-mono)', 'Roboto Mono', 'monospace'],
       },
-      borderRadius: {
-        '3xl': '1.5rem',
-        '4xl': '2rem',
+      colors: {
+        background: "#000000",
+        vercel: {
+          border: "#333333",
+          hover: "#444444",
+          text: "#888888",
+          primary: "#ffffff",
+          secondary: "#111111",
+        }
       },
     },
   },

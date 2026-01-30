@@ -10,8 +10,6 @@ import {
   User,
   PanelLeftClose,
   PanelLeftOpen,
-  Sparkles,
-  LayoutGrid
 } from "lucide-react";
 
 export default function SimpleChat() {
@@ -57,95 +55,75 @@ export default function SimpleChat() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#0F1117] overflow-hidden">
+    <div className="flex h-screen w-full bg-black text-[#ededed] font-sans selection:bg-zinc-800">
 
-      {/* SIDEBAR - Slimmed to 260px */}
+      {/* SIDEBAR */}
       <aside
         style={{ width: isSidebarOpen ? '260px' : '0px' }}
-        className="h-full bg-[#161922]/80 backdrop-blur-2xl border-r border-white/5 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden shrink-0 z-30"
+        className="h-full bg-black border-r border-[#222] transition-all duration-300 overflow-hidden shrink-0 z-30"
       >
-        <div className="w-[260px] p-6 flex flex-col h-full">
-          <div className="flex items-center gap-3 mb-10 px-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 p-[1px]">
-              <div className="w-full h-full rounded-[11px] bg-[#161922] flex items-center justify-center">
-                <LayoutGrid size={16} className="text-white" />
-              </div>
-            </div>
-            <span className="font-bold text-white tracking-tight text-md">Module</span>
-          </div>
-
+        <div className="w-[260px] p-4 flex flex-col h-full">
           <button
             onClick={() => setMessages([])}
-            className="flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-white/10 border border-white/10 py-3 rounded-xl text-sm font-medium text-white transition-all active:scale-[0.98] mb-8 group"
+            className="flex items-center justify-center gap-2 w-full bg-white text-black hover:bg-zinc-200 py-2 rounded-md text-sm font-medium transition-all mb-6 mt-2 shadow-lg shadow-white/5"
           >
-            <PlusCircle size={16} className="text-zinc-400 group-hover:text-white transition-colors" />
+            <PlusCircle size={14} />
             New Chat
           </button>
 
-          <div className="flex-1 space-y-6">
-            <div>
-              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-2 mb-4">Configuration</p>
-
-              {/* Custom Checkbox for RAG */}
-              <label className="flex items-center justify-between p-3 rounded-xl cursor-pointer hover:bg-white/5 transition-all group">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={useRag}
-                    onChange={() => setUseRag(!useRag)}
-                    className="custom-checkbox"
-                  />
-                  <span className={`text-sm font-medium transition-colors ${useRag ? 'text-zinc-200' : 'text-zinc-500'}`}>
-                    Enable RAG
-                  </span>
-                </div>
-                <Zap size={14} className={useRag ? 'text-purple-400' : 'text-zinc-600'} />
-              </label>
-            </div>
+          <div className="flex-1">
+            <label className="flex items-center justify-between w-full px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-[#111] transition-colors group">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={useRag}
+                  onChange={() => setUseRag(!useRag)}
+                  className="custom-checkbox"
+                />
+                <span className={useRag ? 'text-white' : 'text-zinc-500 font-medium'}>Retrieval-Augmented Generation (RAG)</span>
+              </div>
+              <Zap size={14} className={useRag ? 'text-blue-500' : 'text-zinc-800'} />
+            </label>
           </div>
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col min-w-0 h-full relative z-10">
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col min-w-0 h-full bg-black">
 
         {/* HEADER */}
-        <header className="h-20 flex items-center px-10 justify-between shrink-0 bg-transparent">
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-zinc-400 hover:text-white border border-white/5 shadow-xl"
-            >
-              {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-            </button>
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-bold tracking-tight text-gradient-premium">Chat</h2>
-            </div>
-          </div>
+        <header className="h-14 flex items-center px-6 shrink-0 vercel-glass z-20">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-1.5 hover:bg-[#111] rounded-md transition-colors text-zinc-500 hover:text-white"
+          >
+            {isSidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          </button>
         </header>
 
         {/* CHAT VIEW */}
-        <div className="flex-1 overflow-y-auto px-6 md:px-12 hide-scrollbar">
-          <div className="max-w-4xl mx-auto w-full space-y-12 py-10">
+        <div className="flex-1 overflow-y-auto px-6 hide-scrollbar">
+          <div className="max-w-3xl mx-auto w-full flex flex-col space-y-8 py-12">
             {messages.length === 0 ? (
-              <div className="h-[50vh] flex flex-col items-center justify-center text-center opacity-40">
-                <div className="p-6 rounded-[2rem] bg-white/5 border border-white/5 mb-6">
-                  <Bot size={40} strokeWidth={1.5} className="text-zinc-400" />
-                </div>
-                <h1 className="text-lg font-medium text-white tracking-[0.2em] uppercase">Session Ready</h1>
+              <div className="h-[40vh] flex flex-col items-center justify-center text-center opacity-20">
+                <Bot size={48} strokeWidth={1} className="text-white mb-4" />
+                <p className="text-sm tracking-widest uppercase">How can I help you today?</p>
               </div>
             ) : (
               messages.map((m, i) => (
-                <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} w-full animate-message`}>
-                  <div className="flex items-center gap-2 mb-3 px-2">
-                    <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${m.role === 'user' ? 'text-blue-400/70' : 'text-purple-400/70'}`}>
-                      {m.role === 'user' ? 'User' : 'Assistant'}
-                    </span>
-                  </div>
-                  <div className={`max-w-[85%] md:max-w-[75%] ${m.role === 'user' ? 'matte-user' : 'matte-ai'}`}>
-                    <div className="prose prose-invert prose-sm max-w-none prose-p:text-zinc-200 prose-p:text-[15px] prose-p:leading-relaxed">
-                      <ReactMarkdown>{m.content}</ReactMarkdown>
+                <div
+                  key={i}
+                  className={`flex w-full ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2`}
+                >
+                  <div className={`flex flex-col max-w-[80%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div className={m.role === 'user' ? 'bubble-user glow-user' : 'bubble-ai glow-ai'}>
+                      <div className={`prose prose-sm max-w-none ${m.role === 'user' ? 'prose-invert text-black' : 'prose-invert text-zinc-300'}`}>
+                        <ReactMarkdown>{m.content}</ReactMarkdown>
+                      </div>
                     </div>
+                    <span className="text-[9px] mt-1.5 px-1 font-mono uppercase text-zinc-600 tracking-tighter">
+                      {m.role === 'user' ? 'User' : 'LLM'}
+                    </span>
                   </div>
                 </div>
               ))
@@ -155,14 +133,9 @@ export default function SimpleChat() {
         </div>
 
         {/* INPUT AREA */}
-        <div className="w-full flex justify-center p-6 pb-10 shrink-0">
+        <div className="w-full flex justify-center p-6 pb-10 shrink-0 bg-black">
           <div className="w-full max-w-2xl">
-            <div className="relative flex items-end bg-[#1C212E]/60 backdrop-blur-3xl border border-white/10 rounded-[28px] p-2 input-glow group transition-all duration-300">
-
-              <div className="mb-3.5 ml-4 text-zinc-500 group-focus-within:text-purple-400 transition-colors duration-500">
-                <Sparkles size={18} />
-              </div>
-
+            <div className="relative flex items-end bg-[#0a0a0a] border border-[#222] rounded-xl focus-within:border-zinc-500 transition-all duration-300 shadow-2xl">
               <textarea
                 rows={1}
                 value={input}
@@ -174,30 +147,27 @@ export default function SimpleChat() {
                   }
                 }}
                 placeholder="Send a message..."
-                className="flex-1 bg-transparent border-none focus:ring-0 text-white px-4 py-3.5 resize-none max-h-48 outline-none text-[15px] leading-relaxed placeholder-zinc-600 input-scroll overflow-y-auto"
+                className="flex-1 bg-transparent border-none focus:ring-0 text-[15px] text-white px-4 py-4 resize-none max-h-60 outline-none placeholder-zinc-800"
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   target.style.height = 'auto';
-                  target.style.height = `${Math.min(target.scrollHeight, 192)}px`;
+                  target.style.height = `${target.scrollHeight}px`;
                 }}
               />
 
-              <button
-                onClick={handleSubmit}
-                disabled={!input.trim() || isLoading}
-                className={`w-11 h-11 rounded-[22px] flex items-center justify-center transition-all duration-500 mb-0.5 mr-0.5 shrink-0 ${
-                  input.trim()
-                  ? 'btn-gradient text-white scale-100 shadow-lg'
-                  : 'bg-white/5 text-zinc-700 scale-75 opacity-10'
-                }`}
-              >
-                <ArrowUp size={22} strokeWidth={3} />
-              </button>
-            </div>
-
-            <div className="flex justify-center mt-5 gap-8 select-none opacity-20 hover:opacity-40 transition-opacity">
-                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">Secure Node</span>
-                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">v4.0.0</span>
+              <div className="p-2">
+                <button
+                  onClick={handleSubmit}
+                  disabled={!input.trim() || isLoading}
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                    input.trim()
+                    ? 'bg-white text-black hover:scale-105 active:scale-95'
+                    : 'bg-[#111] text-zinc-800'
+                  }`}
+                >
+                  <ArrowUp size={18} strokeWidth={2.5} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
