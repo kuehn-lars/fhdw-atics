@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Any, Optional
+from typing import List, Any, Optional, Iterator
 from pydantic import BaseModel
 
 class Document(BaseModel):
@@ -32,4 +32,8 @@ class VectorStore(ABC):
 class LLMInterface(ABC):
     @abstractmethod
     def generate(self, prompt: str, context: Optional[str] = None) -> str:
+        pass
+
+    @abstractmethod
+    def stream(self, prompt: str, context: Optional[str] = None) -> Iterator[str]:
         pass

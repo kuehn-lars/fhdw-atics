@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Iterator
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from src.rag_system.core.base import LLMInterface
 
@@ -10,3 +10,8 @@ class NVIDIAModule(LLMInterface):
         full_prompt = f"Context: {context}\n\nQuestion: {prompt}" if context else prompt
         response = self.llm.invoke(full_prompt)
         return response.content
+
+    def stream(self, prompt: str, context: Optional[str] = None) -> Iterator[str]:
+        full_prompt = f"Context: {context}\n\nQuestion: {prompt}" if context else prompt
+        for chunk in self.llm.stream(full_prompt):
+            yield str(chunk.content)

@@ -5,11 +5,15 @@ pydantic
 pydantic-settings
 python-dotenv
 langchain
-langchain-community
+langchain-ollama
 langchain-core
 langchain-openai
 langchain-nvidia-ai-endpoints
 chromadb
 openai
+transformers
+accelerate
+torch
+bitsandbytes
 pytest
 python-multipart
