@@ -39,9 +39,19 @@ class VectorStore(ABC):
 
 class LLMInterface(ABC):
     @abstractmethod
-    def generate(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> str:
+    def generate(
+        self,
+        prompt: str,
+        context: Optional[str] = None,
+        max_new_tokens: int = 512,
+    ) -> str:
         pass
 
     @abstractmethod
-    def stream(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> Iterator[str]:
+    def stream(
+        self,
+        prompt: str,
+        context: Optional[str] = None,
+        max_new_tokens: int = 512,
+    ) -> Iterator[str]:
         pass
