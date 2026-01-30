@@ -1,5 +1,6 @@
 import sys
 import os
+import subprocess
 from pathlib import Path
 
 # Add project root to sys.path
@@ -16,7 +17,30 @@ def setup():
     """
     Download/Pull required Ollama models.
     """
-    control.setup()
+    models = [
+        "qwen2.5:0.5b",
+        "llama3.2:1b",
+        "llama3:8b",
+        "qwen2.5:3b"
+    ]
+    
+    typer.echo("------------------------------------------")
+    typer.echo("Starting Ollama model setup...")
+    typer.echo("------------------------------------------")
+    
+    for model in models:
+        typer.echo(f">>> Pulling model: {model}")
+        try:
+            subprocess.run(["ollama", "pull", model], check=True)
+        except subprocess.CalledProcessError:
+            typer.echo(f"Error: Could not pull model {model}. Is Ollama running?")
+        except FileNotFoundError:
+            typer.echo("Error: 'ollama' command not found. Please install Ollama first.")
+            break
+
+    typer.echo("------------------------------------------")
+    typer.echo("Ollama setup complete!")
+    typer.echo("------------------------------------------")
 
 @app.command()
 def query(
