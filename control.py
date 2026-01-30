@@ -1,37 +1,38 @@
 from typing import Optional, Iterator, Union
 from src.rag_system.orchestration.factory import get_rag_pipeline
 
+
 def query(
-    question: str, 
-    use_rag: bool = True, 
-    stream: bool = False, 
-    backend: Optional[str] = None, 
+    question: str,
+    use_rag: bool = True,
+    stream: bool = False,
+    backend: Optional[str] = None,
     model: Optional[str] = None,
-    max_new_tokens: int = 512
+    max_new_tokens: int = 512,
 ) -> Union[str, Iterator[str]]:
     """
     High-level API to interact with the RAG system programmatically.
-    
-    This function encapsulates the logic used in the CLI and provides a clean entry point 
+
+    This function encapsulates the logic used in the CLI and provides a clean entry point
     for other scripts or applications.
 
     Parameters:
     -----------
     question : str
         The query or prompt to send to the LLM.
-    
+
     use_rag : bool, default=True
-        If True, the system will perform a vector search to find relevant context 
+        If True, the system will perform a vector search to find relevant context
         and include it in the prompt. If False, the LLM is queried directly.
-    
+
     stream : bool, default=False
-        If True, the function returns an iterator that yields chunks of the response 
+        If True, the function returns an iterator that yields chunks of the response
         in real-time. If False, it returns the complete response as a single string.
-    
+
     backend : str, optional
-        Override the default backend mode ('api', 'local', 'nvidia'). 
+        Override the default backend mode ('api', 'local', 'nvidia').
         If None, the value from `config.settings` is used.
-    
+
     model : str, optional
         Override the default model name or path.
         Example: 'Qwen/Qwen2.5-0.5B-Instruct' or 'gpt-3.5-turbo'.
@@ -55,16 +56,21 @@ def query(
     for chunk in query("Hello!", backend="local", stream=True):
         print(chunk, end="", flush=True)
     """
-    
+
     # Initialize the pipeline with optional overrides
     pipeline = get_rag_pipeline(backend_mode=backend, model_name=model)
-    
+
     if stream:
         # Returns an Iterator[str]
-        return pipeline.stream_query(question, use_rag=use_rag, max_new_tokens=max_new_tokens)
+        return pipeline.stream_query(
+            question, use_rag=use_rag, max_new_tokens=max_new_tokens
+        )
     else:
         # Returns a single str
-        return pipeline.query(question, use_rag=use_rag, max_new_tokens=max_new_tokens)
+        return pipeline.query(
+            question, use_rag=use_rag, max_new_tokens=max_new_tokens
+        )
+
 
 if __name__ == "__main__":
     # Example for quick testing
@@ -75,4 +81,6 @@ if __name__ == "__main__":
         print(f"Response: {response}")
     except Exception as e:
         print(f"Error during test: {e}")
-        print("Tip: Make sure to set BACKEND_MODE=local in your .env or specify backend='local' in the call.")
+        print(
+            "Tip: Make sure to set BACKEND_MODE=local in your .env or specify backend='local' in the call."
+        )
