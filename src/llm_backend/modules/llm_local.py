@@ -65,21 +65,21 @@ class HuggingFaceLLM(LLMInterface):
             add_generation_prompt=True
         )
 
-    def generate(self, prompt: str, context: Optional[str] = None) -> str:
+    def generate(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> str:
         full_prompt = self._get_formatted_prompt(prompt, context)
-        results = self.pipe(full_prompt)
+        results = self.pipe(full_prompt, max_new_tokens=max_new_tokens)
         # Handle cases where the model might repeat the prompt
         generated = results[0]["generated_text"]
         if generated.startswith(full_prompt):
             return generated[len(full_prompt):].strip()
         return generated.strip()
 
-    def stream(self, prompt: str, context: Optional[str] = None) -> Iterator[str]:
+    def stream(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> Iterator[str]:
         full_prompt = self._get_formatted_prompt(prompt, context)
         streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True)
         
         inputs = self.tokenizer(full_prompt, return_tensors="pt").to(self.model.device)
-        generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=512)
+        generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=max_new_tokens)
         
         thread = threading.Thread(target=self.model.generate, kwargs=generation_kwargs)
         thread.start()
@@ -88,22 +88,26 @@ class HuggingFaceLLM(LLMInterface):
             yield new_text
 
 class LocalLLMModule(LLMInterface):
-    def __init__(self, model_name: str = "llama3"):
-        # Heuristic to distinguish between Ollama and HuggingFace
-        # Most HF models contain a '/' (author/model)
-        if "/" in model_name:
-            self.llm = HuggingFaceLLM(model_name=model_name)
+    def __init__(self, model_name: str):
+        # Intelligent selection: if it looks like a Hugging Face model path, use HuggingFaceLLM
+        # Otherwise, assume it's an Ollama model name.
+        if "/" in model_name or os.path.exists(model_name):
+            self.llm = HuggingFaceLLM(model_name)
         else:
             self.llm = Ollama(model=model_name)
     
-    def generate(self, prompt: str, context: Optional[str] = None) -> str:
-        return self.llm.generate(prompt, context)
-
-    def stream(self, prompt: str, context: Optional[str] = None) -> Iterator[str]:
-        # Ollama in LangChain supports .stream()
+    def generate(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> str:
         if isinstance(self.llm, Ollama):
             full_prompt = f"Context: {context}\n\nQuestion: {prompt}" if context else prompt
-            for chunk in self.llm.stream(full_prompt):
+            # Note: Ollama doesn't have a direct 'max_new_tokens' parameter in its standard invoke, 
+            # but we can pass it via num_predict
+            return self.llm.invoke(full_prompt, num_predict=max_new_tokens)
+        return self.llm.generate(prompt, context, max_new_tokens=max_new_tokens)
+
+    def stream(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> Iterator[str]:
+        if isinstance(self.llm, Ollama):
+            full_prompt = f"Context: {context}\n\nQuestion: {prompt}" if context else prompt
+            for chunk in self.llm.stream(full_prompt, num_predict=max_new_tokens):
                 yield str(chunk)
         else:
-            yield from self.llm.stream(prompt, context)
+            yield from self.llm.stream(prompt, context, max_new_tokens=max_new_tokens)

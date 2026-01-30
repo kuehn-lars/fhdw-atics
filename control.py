@@ -6,7 +6,8 @@ def query(
     use_rag: bool = True, 
     stream: bool = False, 
     backend: Optional[str] = None, 
-    model: Optional[str] = None
+    model: Optional[str] = None,
+    max_new_tokens: int = 512
 ) -> Union[str, Iterator[str]]:
     """
     High-level API to interact with the RAG system programmatically.
@@ -35,6 +36,9 @@ def query(
         Override the default model name or path.
         Example: 'Qwen/Qwen2.5-0.5B-Instruct' or 'gpt-3.5-turbo'.
 
+    max_new_tokens : int, default=512
+        The maximum number of tokens to generate.
+
     Returns:
     --------
     Union[str, Iterator[str]]
@@ -44,11 +48,11 @@ def query(
     Example Usage:
     --------------
     # 1. Simple synchronous query
-    answer = query_rag("What is RAG?")
+    answer = query("What is RAG?", max_new_tokens=100)
     print(answer)
 
     # 2. Local model with streaming
-    for chunk in query_rag("Hello!", backend="local", stream=True):
+    for chunk in query("Hello!", backend="local", stream=True):
         print(chunk, end="", flush=True)
     """
     
@@ -57,10 +61,10 @@ def query(
     
     if stream:
         # Returns an Iterator[str]
-        return pipeline.stream_query(question, use_rag=use_rag)
+        return pipeline.stream_query(question, use_rag=use_rag, max_new_tokens=max_new_tokens)
     else:
         # Returns a single str
-        return pipeline.query(question, use_rag=use_rag)
+        return pipeline.query(question, use_rag=use_rag, max_new_tokens=max_new_tokens)
 
 if __name__ == "__main__":
     # Example for quick testing
@@ -70,7 +74,7 @@ if __name__ == "__main__":
     try:
         # Default behavior (uses config/settings.py)
         # Note: Will fail if OPENAI_API_KEY is not set and backend is 'api'
-        response = query_rag("1+1", use_rag=False)
+        response = query("1+1", use_rag=False)
         print(f"Response: {response}")
     except Exception as e:
         print(f"Error during test: {e}")

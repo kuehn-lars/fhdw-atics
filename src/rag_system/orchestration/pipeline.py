@@ -7,7 +7,7 @@ class RAGPipeline:
         self.vector_store = vector_store
         self.llm = llm
         
-    def query(self, user_query: str, use_rag: bool = True) -> str:
+    def query(self, user_query: str, use_rag: bool = True, max_new_tokens: int = 512) -> str:
         if use_rag:
             query_vector = self.embedder.embed_text(user_query)
             relevant_docs = self.vector_store.search(query_vector)
@@ -15,10 +15,9 @@ class RAGPipeline:
         else:
             context = None
             
-        response = self.llm.generate(user_query, context=context)
-        return response
+        return self.llm.generate(user_query, context=context, max_new_tokens=max_new_tokens)
 
-    def stream_query(self, user_query: str, use_rag: bool = True) -> Iterator[str]:
+    def stream_query(self, user_query: str, use_rag: bool = True, max_new_tokens: int = 512) -> Iterator[str]:
         if use_rag:
             query_vector = self.embedder.embed_text(user_query)
             relevant_docs = self.vector_store.search(query_vector)
@@ -26,4 +25,4 @@ class RAGPipeline:
         else:
             context = None
             
-        return self.llm.stream(user_query, context=context)
+        return self.llm.stream(user_query, context=context, max_new_tokens=max_new_tokens)

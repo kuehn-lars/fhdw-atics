@@ -48,7 +48,8 @@ def query(
     use_rag: bool = typer.Option(True, help="Toggle RAG on or off"),
     stream: bool = typer.Option(True, help="Toggle streaming output"),
     backend: Optional[str] = typer.Option(None, help="Override backend mode (api, local, nvidia)"),
-    model: Optional[str] = typer.Option(None, help="Override model name")
+    model: Optional[str] = typer.Option(None, help="Override model name"),
+    max_tokens: int = typer.Option(512, help="Maximum number of tokens to generate")
 ):
     """
     Ask a question to the RAG system via CLI.
@@ -62,7 +63,8 @@ def query(
             use_rag=use_rag, 
             stream=stream, 
             backend=backend, 
-            model=model
+            model=model,
+            max_new_tokens=max_tokens
         )
         
         if stream:

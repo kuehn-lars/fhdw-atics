@@ -19,6 +19,7 @@ class QueryRequest(BaseModel):
     stream: bool = False
     backend: Optional[str] = None
     model: Optional[str] = None
+    max_new_tokens: int = 512
 
 class QueryResponse(BaseModel):
     answer: str
@@ -50,7 +51,10 @@ async def query_endpoint(request: QueryRequest):
         Override the default backend mode ('api', 'local', 'nvidia').
     
     model : str, optional
-        Override the default model name or path (e.g. 'gpt-4o' or a HuggingFace path).
+        Override the default model name or path.
+
+    max_new_tokens : int, default=512
+        The maximum number of tokens to generate.
 
     Returns:
     --------
@@ -63,7 +67,8 @@ async def query_endpoint(request: QueryRequest):
             use_rag=request.use_rag,
             stream=request.stream,
             backend=request.backend,
-            model=request.model
+            model=request.model,
+            max_new_tokens=request.max_new_tokens
         )
         
         if request.stream:
