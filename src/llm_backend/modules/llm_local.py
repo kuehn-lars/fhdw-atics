@@ -1,15 +1,25 @@
 import os
 import torch
 import threading
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig, TextIteratorStreamer
-from typing import Optional, Iterator
+from typing import Iterator, Optional
+
+import torch
 from langchain_ollama import OllamaLLM as Ollama
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    TextIteratorStreamer,
+    pipeline,
+)
+
 from src.rag_system.core.base import LLMInterface
+
 
 class HuggingFaceLLM(LLMInterface):
     def __init__(self, model_name: str, use_4bit: bool = True):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        
+
         # Use MPS for Apple Silicon, CUDA for NVIDIA, or CPU
         if torch.backends.mps.is_available():
             device = "mps"
@@ -17,7 +27,7 @@ class HuggingFaceLLM(LLMInterface):
             device = "cuda"
         else:
             device = "cpu"
-            
+
         # 4-bit quantization configuration (bitsandbytes is mostly CUDA-only)
         bnb_config = None
         if use_4bit and device == "cuda":
@@ -28,42 +38,57 @@ class HuggingFaceLLM(LLMInterface):
                 bnb_4bit_use_double_quant=True,
             )
         elif use_4bit and device == "mps":
-            print("Note: int4 via bitsandbytes is not fully supported on MPS. Using float16 instead. For int4 on Mac, please use Ollama.")
-            
+            print(
+                "Note: int4 via bitsandbytes is not fully supported on MPS. Using float16 instead. For int4 on Mac, please use Ollama."
+            )
+
         try:
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 quantization_config=bnb_config,
-                torch_dtype=torch.float16 if device != "cpu" else torch.float32,
-                device_map="auto" if device != "cpu" else None
+                torch_dtype=(
+                    torch.float16 if device != "cpu" else torch.float32
+                ),
+                device_map="auto" if device != "cpu" else None,
             )
         except Exception as e:
-            print(f"Warning: Loading with device_map='auto' failed: {e}. Trying explicit device.")
+            print(
+                f"Warning: Loading with device_map='auto' failed: {e}. Trying explicit device."
+            )
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
-                torch_dtype=torch.float16 if device != "cpu" else torch.float32
+                torch_dtype=(
+                    torch.float16 if device != "cpu" else torch.float32
+                ),
             ).to(device)
-            
+
         self.pipe = pipeline(
             "text-generation",
             model=self.model,
             tokenizer=self.tokenizer,
-            max_new_tokens=512
+            max_new_tokens=512,
         )
 
-    def _get_formatted_prompt(self, prompt: str, context: Optional[str] = None) -> str:
+    def _get_formatted_prompt(
+        self, prompt: str, context: Optional[str] = None
+    ) -> str:
         messages = []
         if context:
-            messages.append({"role": "system", "content": f"You are a helpful assistant. Use the following context to answer the question: {context}"})
+            messages.append(
+                {
+                    "role": "system",
+                    "content": f"You are a helpful assistant. Use the following context to answer the question: {context}",
+                }
+            )
         else:
-            messages.append({"role": "system", "content": "You are a helpful assistant."})
-            
+            messages.append(
+                {"role": "system", "content": "You are a helpful assistant."}
+            )
+
         messages.append({"role": "user", "content": prompt})
-        
+
         return self.tokenizer.apply_chat_template(
-            messages, 
-            tokenize=False, 
-            add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True
         )
 
     def generate(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> str:
@@ -72,7 +97,7 @@ class HuggingFaceLLM(LLMInterface):
         # Handle cases where the model might repeat the prompt
         generated = results[0]["generated_text"]
         if generated.startswith(full_prompt):
-            return generated[len(full_prompt):].strip()
+            return generated[len(full_prompt) :].strip()
         return generated.strip()
 
     def stream(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> Iterator[str]:
@@ -84,9 +109,10 @@ class HuggingFaceLLM(LLMInterface):
         
         thread = threading.Thread(target=self.model.generate, kwargs=generation_kwargs)
         thread.start()
-        
+
         for new_text in streamer:
             yield new_text
+
 
 class LocalLLMModule(LLMInterface):
     def __init__(self, model_name: str):

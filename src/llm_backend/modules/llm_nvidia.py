@@ -1,9 +1,14 @@
-from typing import Optional, Iterator
+from typing import Iterator, Optional
+
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
+
 from src.rag_system.core.base import LLMInterface
 
+
 class NVIDIAModule(LLMInterface):
-    def __init__(self, api_key: str, model_name: str = "meta/llama-3.2-3b-instruct"):
+    def __init__(
+        self, api_key: str, model_name: str = "meta/llama-3.2-3b-instruct"
+    ):
         self.llm = ChatNVIDIA(nvidia_api_key=api_key, model=model_name)
     
     def generate(self, prompt: str, context: Optional[str] = None, max_new_tokens: int = 512) -> str:

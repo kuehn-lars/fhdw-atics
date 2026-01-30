@@ -1,16 +1,12 @@
-import sys
-import os
-import subprocess
-from pathlib import Path
-
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).parent.parent))
+from typing import Optional
 
 import typer
-from typing import Optional
-import control
+
+from config.settings import settings
+from src.rag_system.orchestration.factory import get_rag_pipeline
 
 app = typer.Typer()
+
 
 @app.command()
 def setup():
@@ -44,7 +40,7 @@ def setup():
 
 @app.command()
 def query(
-    question: str, 
+    question: str,
     use_rag: bool = typer.Option(True, help="Toggle RAG on or off"),
     stream: bool = typer.Option(True, help="Toggle streaming output"),
     backend: Optional[str] = typer.Option(None, help="Override backend mode (api, local, nvidia)"),
@@ -71,7 +67,7 @@ def query(
             typer.echo("Answer: ", nl=False)
             for chunk in response:
                 typer.echo(chunk, nl=False)
-            typer.echo() # Newline at the end
+            typer.echo()  # Newline at the end
         else:
             typer.echo(f"Answer: {response}")
             
@@ -85,6 +81,7 @@ def ingest(source: str):
     Ingest a document or directory into the RAG system.
     """
     typer.echo(f"Ingesting source: {source}")
+
 
 if __name__ == "__main__":
     app()

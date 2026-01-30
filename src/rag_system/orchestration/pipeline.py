@@ -1,8 +1,17 @@
-from typing import List, Iterator
-from src.rag_system.core.base import Document, Embedder, VectorStore, LLMInterface
+from typing import Iterator, List
+
+from src.rag_system.core.base import (
+    Document,
+    Embedder,
+    LLMInterface,
+    VectorStore,
+)
+
 
 class RAGPipeline:
-    def __init__(self, embedder: Embedder, vector_store: VectorStore, llm: LLMInterface):
+    def __init__(
+        self, embedder: Embedder, vector_store: VectorStore, llm: LLMInterface
+    ):
         self.embedder = embedder
         self.vector_store = vector_store
         self.llm = llm

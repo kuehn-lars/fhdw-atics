@@ -1,6 +1,9 @@
-from typing import Optional, Iterator
+from typing import Iterator, Optional
+
 from langchain_openai import ChatOpenAI
+
 from src.rag_system.core.base import LLMInterface
+
 
 class OpenAIModule(LLMInterface):
     def __init__(self, api_key: str, model_name: str = "gpt-3.5-turbo"):
