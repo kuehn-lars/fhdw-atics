@@ -24,7 +24,7 @@ app.add_middleware(
 class QueryRequest(BaseModel):
     question: str
     use_rag: bool = True
-    stream: bool = True
+    stream: bool = False
     backend: Optional[str] = None
     model: Optional[str] = None
     max_new_tokens: int = 512
