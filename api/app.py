@@ -23,7 +23,34 @@ class QueryResponse(BaseModel):
 async def query_endpoint(request: QueryRequest):
     """
     FastAPI endpoint for querying the RAG system.
-    Supports optional streaming and model/backend overrides.
+    
+    This endpoint allows clients to send questions to the LLM backend, 
+    with optional RAG context retrieval, streaming output, and model/backend overrides.
+
+    Parameters (passed via QueryRequest JSON body):
+    -----------------------------------------------
+    question : str
+        The query string or prompt to send to the assistant.
+    
+    use_rag : bool, default=True
+        Toggle whether the system should search for relevant local documents 
+        to provide context to the LLM.
+    
+    stream : bool, default=False
+        If True, the endpoint returns a `StreamingResponse` that yields the LLM 
+        output token by token (text/plain).
+        If False, it returns a standard JSON `QueryResponse`.
+    
+    backend : str, optional
+        Override the default backend mode ('api', 'local', 'nvidia').
+    
+    model : str, optional
+        Override the default model name or path (e.g. 'gpt-4o' or a HuggingFace path).
+
+    Returns:
+    --------
+    - JSON (QueryResponse): If stream=False.
+    - Stream (text/plain): If stream=True.
     """
     try:
         pipeline = get_rag_pipeline(backend_mode=request.backend, model_name=request.model)
