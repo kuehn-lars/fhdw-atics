@@ -2,6 +2,7 @@ from typing import Any, Optional
 
 from config.settings import settings
 from src.llm_backend.manager import LLMManager
+from src.rag_system.core.base import Document, DocumentLoader
 from src.rag_system.modules.embeddings_openai import OpenAIEmbeddingsModule
 from src.rag_system.modules.vector_store_chroma import ChromaVectorStore
 from src.rag_system.orchestration.pipeline import RAGPipeline
@@ -38,3 +39,7 @@ def get_rag_pipeline(
         embedder = LocalEmbedderModule()
 
     return RAGPipeline(embedder=embedder, vector_store=vector_store, llm=llm)
+
+# if __name__ == "__main__":
+#     vector_store = ChromaVectorStore(path=settings.vector_db_path)
+#     vector_store.add_documents(DocumentLoader().load(settings.documents_path))

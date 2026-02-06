@@ -1,6 +1,8 @@
+import os
+from config.settings import settings
 from abc import ABC, abstractmethod
 from typing import Any, Iterator, List, Optional
-
+from langchain_ollama import OllamaEmbeddings
 from pydantic import BaseModel
 
 
@@ -9,21 +11,25 @@ class Document(BaseModel):
     metadata: dict = {}
 
 
-class DocumentLoader(ABC):
-    @abstractmethod
+class DocumentLoader():
     def load(self, source: str) -> List[Document]:
-        pass
+        list_of_docs = os.listdir(source)
+        docs = []
+        for doc in list_of_docs:
+            with open(os.path.join(source, doc), "r", encoding="utf-8") as f:
+                content = f.read()
+                docs.append(Document(content=content, metadata={"source": doc}))
+        return docs
 
 
-class Embedder(ABC):
-    @abstractmethod
+class Embedder():
     def embed_text(self, text: str) -> List[float]:
-        pass
+        client = OllamaEmbeddings(model=settings.local_model)
+        return client.embed_query(text)
 
-    @abstractmethod
     def embed_documents(self, documents: List[str]) -> List[List[float]]:
-        pass
-
+        client = OllamaEmbeddings(model=settings.local_model)
+        return client.embed_documents(documents)
 
 class VectorStore(ABC):
     @abstractmethod
@@ -55,3 +61,9 @@ class LLMInterface(ABC):
         max_new_tokens: int = 512,
     ) -> Iterator[str]:
         pass
+
+if __name__ == "__main__":
+    # Example usage
+    loader = DocumentLoader()
+    docs = loader.load("../../../documents")
+    print(docs[0].content)
