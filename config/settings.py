@@ -22,7 +22,9 @@ class Settings(BaseSettings):
 
     # Vector DB
     vector_db_path: str = "./chroma_db"
-
+    # Documents Path
+    documents_path: str = "./documents"
+    
     model_config = SettingsConfigDict(env_file=".env")
 
 
