@@ -2,7 +2,8 @@ from typing import List
 
 import chromadb
 
-from src.rag_system.core.base import Document, VectorStore
+from config.settings import settings
+from src.rag_system.core.base import Document, VectorStore, Embedder
 
 
 class ChromaVectorStore(VectorStore):
@@ -13,12 +14,16 @@ class ChromaVectorStore(VectorStore):
         )
 
     def add_documents(self, documents: List[Document]):
-        for i, doc in enumerate(documents):
-            self.collection.add(
-                documents=[doc.content],
-                metadatas=[doc.metadata],
-                ids=[f"id_{i}"],
-            )
+        embedder = Embedder()
+        texts = [doc.content for doc in documents]
+        embeddings = embedder.embed_documents(texts)
+
+        self.collection.add(
+            documents=texts,
+            metadatas=[doc.metadata for doc in documents],
+            embeddings=embeddings,
+            ids=[f"id_{i}" for i in range(len(documents))]
+        )
 
     def search(
         self, query_vector: List[float], top_k: int = 5
