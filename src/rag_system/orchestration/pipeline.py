@@ -16,6 +16,12 @@ class RAGPipeline:
         self.vector_store = vector_store
         self.llm = llm
 
+    def retrieve(self, query: str) -> List[Document]:
+        """Retrieves relevant documents for a given query."""
+        query_vector = self.embedder.embed_text(query)
+        relevant_docs = self.vector_store.search(query_vector)
+        return relevant_docs
+
     def query(
         self, user_query: str, use_rag: bool = True, max_new_tokens: int = 512
     ) -> str:
