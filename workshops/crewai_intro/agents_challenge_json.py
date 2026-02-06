@@ -47,7 +47,26 @@ class RagSearchTool(BaseTool):
 search_tool = RagSearchTool()
 
 # =============================================================================
-# 🤖 TEIL 2: AGENTEN
+# � TEIL 2b: LOGGING (NEU!)
+# =============================================================================
+
+# Hier speichern wir ALLES, was passiert
+execution_logs = []
+
+def step_callback(step_output):
+    """
+    Diese Funktion wird NACH jedem Schritt eines Agenten aufgerufen.
+    Wir speichern das Ergebnis in unserer Log-Liste.
+    """
+    # Wir untersuchen, was 'step_output' ist (meist ein Tuple oder Objekt)
+    # CrewAI liefert hier oft rohe Infos. Wir formatieren es grob.
+    execution_logs.append({
+        "agent": "Unknown (Step Callback)", # In neueren CrewAI Versionen schwieriger direkt zuzuordnen
+        "details": str(step_output)
+    })
+
+# =============================================================================
+# �🤖 TEIL 2: AGENTEN
 # =============================================================================
 
 def create_agents():
@@ -58,7 +77,8 @@ def create_agents():
         verbose=True,
         allow_delegation=False,
         tools=[search_tool],
-        llm=my_llm
+        llm=my_llm,
+        step_callback=step_callback # 👈 Hier hängen wir den Logger ein!
     )
 
     formatter = Agent(
@@ -71,7 +91,8 @@ def create_agents():
         """,
         verbose=True,
         allow_delegation=False,
-        llm=my_llm
+        llm=my_llm,
+        step_callback=step_callback # 👈 Hier auch!
     )
     
     return researcher, formatter
@@ -120,17 +141,33 @@ def run_challenge_json(challenge_input: str):
     print(f"\n🎬 STARTE JSON-CHALLENGE FÜR: '{challenge_input}'")
     result = crew.kickoff()
     
-    # Das Ergebnis ist jetzt ein Pydantic Objekt!
-    # Wir können es direkt als JSON ausgeben:
+    # --- NEU: Zugriff auf die einzelnen Ergebnisse ---
+    print("\n\n" + "="*50)
+    print("📝 RAW OUTPUT: SENIOR RESEARCHER")
+    print("-" * 50)
+    print(t_research.output.raw_output)
+    print("="*50)
+
+    print("\n\n" + "="*50)
+    print("🤖 RAW OUTPUT: DATA FORMATTER (JSON)")
+    print("-" * 50)
+    # Das ist das rohe Ergebnis des Formatters (der String, der das JSON enthält)
+    print(t_format.output.raw_output)
+    print("="*50)
+
+    # --- NEU: Das vollständige Execution Log ---
+    print("\n\n" + "="*50)
+    print("📜 COMPLETE EXECUTION TRACE (ALL STEPS)")
+    print("-" * 50)
+    # Wir geben das Log als formatiertes JSON aus
+    print(json.dumps(execution_logs, indent=2, default=str))
+    print("="*50)
+
     return result.pydantic.model_dump_json(indent=2)
 
 if __name__ == "__main__":
     challenge_input = "Was ist Retrieval Augmented Generation?"
     
     json_output = run_challenge_json(challenge_input)
-    
-    print("\n" + "="*50)
-    print(f"✅ FINAL FRONTEND JSON:")
-    print("-" * 50)
-    print(json_output)
-    print("="*50 + "\n\n")
+    # Final output already printed above via task introspection
+
