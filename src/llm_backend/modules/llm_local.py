@@ -2,22 +2,20 @@ import os
 import torch
 import threading
 from typing import Iterator, Optional
-
-import torch
 from langchain_ollama import OllamaLLM as Ollama
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig,
-    TextIteratorStreamer,
-    pipeline,
-)
+from src.rag_system.core.base import LLMInterface
 
 from src.rag_system.core.base import LLMInterface
 
 
 class HuggingFaceLLM(LLMInterface):
     def __init__(self, model_name: str, use_4bit: bool = True):
+        from transformers import (
+            AutoModelForCausalLM,
+            AutoTokenizer,
+            BitsAndBytesConfig,
+            pipeline,
+        )
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         # Use MPS for Apple Silicon, CUDA for NVIDIA, or CPU
@@ -111,6 +109,7 @@ class HuggingFaceLLM(LLMInterface):
         context: Optional[str] = None,
         max_new_tokens: int = 512,
     ) -> Iterator[str]:
+        from transformers import TextIteratorStreamer
         full_prompt = self._get_formatted_prompt(prompt, context)
         streamer = TextIteratorStreamer(
             self.tokenizer, skip_prompt=True, skip_special_tokens=True
