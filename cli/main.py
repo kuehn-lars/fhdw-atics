@@ -4,6 +4,8 @@ import typer
 
 from config.settings import settings
 from src.rag_system.orchestration.factory import get_rag_pipeline
+from src.rag_system.modules.vector_store_chroma import ChromaVectorStore
+from src.rag_system.core.base import DocumentLoader
 
 app = typer.Typer()
 
@@ -86,6 +88,14 @@ def ingest(source: str):
     """
     typer.echo(f"Ingesting source: {source}")
 
+
+@app.command()
+def setup_vector_store():
+    """
+    Set up the vector store by ingesting documents from the specified path.
+    """
+    vector_store = ChromaVectorStore(path=settings.vector_db_path)
+    vector_store.add_documents(DocumentLoader().load(settings.documents_path))
 
 if __name__ == "__main__":
     app()
