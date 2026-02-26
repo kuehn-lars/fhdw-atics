@@ -1,3 +1,6 @@
+import json
+import sys
+import subprocess
 from typing import Optional
 
 import typer
@@ -56,25 +59,18 @@ def query(
     """
     Ask a question to the RAG system via CLI.
     """
+    pipeline = get_rag_pipeline()
     mode = backend or ("RAG" if use_rag else "Direct LLM")
     typer.echo(f"Querying ({mode}) for: {question}")
 
     try:
-        response = control.query(
-            question=question,
-            use_rag=use_rag,
-            stream=stream,
-            backend=backend,
-            model=model,
-            max_new_tokens=max_tokens,
-        )
-
         if stream:
             typer.echo("Answer: ", nl=False)
-            for chunk in response:
+            for chunk in pipeline.stream_query(question, use_rag=use_rag):
                 typer.echo(chunk, nl=False)
             typer.echo()  # Newline at the end
         else:
+            response = pipeline.query(question, use_rag=use_rag)
             typer.echo(f"Answer: {response}")
 
     except Exception as e:
@@ -96,6 +92,44 @@ def setup_vector_store():
     """
     vector_store = ChromaVectorStore(path=settings.vector_db_path)
     vector_store.add_documents(DocumentLoader().load(settings.documents_path))
+
+
+@app.command()
+def agents(
+    question: str = typer.Argument(..., help="Die Frage an die CrewAI-Agenten"),
+    json_output: bool = typer.Option(False, "--json", help="Ausgabe als JSON"),
+):
+    """
+    Führe die CrewAI-Agenten aus und gib das Ergebnis als Text oder JSON aus.
+    """
+    sys.path.insert(0, ".")
+    try:
+        from workshops.crewai_intro.agents_challenge1 import run_challenge
+    except ImportError as e:
+        typer.echo(f"Import-Fehler: {e}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"🤖 Starte Agenten für: {question}")
+    try:
+        result = run_challenge(question)
+        answer = str(result)
+
+        if json_output:
+            payload = json.dumps({"type": "result", "answer": answer}, ensure_ascii=False, indent=2)
+            typer.echo(payload)
+        else:
+            typer.echo("\n" + "="*60)
+            typer.echo("📝 ANTWORT DER AGENTEN:")
+            typer.echo("-"*60)
+            typer.echo(answer)
+            typer.echo("="*60)
+    except Exception as e:
+        if json_output:
+            typer.echo(json.dumps({"type": "error", "message": str(e)}))
+        else:
+            typer.echo(f"Fehler: {e}", err=True)
+        raise typer.Exit(1)
+
 
 if __name__ == "__main__":
     app()

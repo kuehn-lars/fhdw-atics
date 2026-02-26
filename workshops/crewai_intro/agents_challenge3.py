@@ -20,6 +20,11 @@ os.environ["OPENAI_API_KEY"] = "NA"
 my_llm = f"openai/{settings.local_model}"
 
 # =============================================================================
+# ⚙️  KONFIGURATION – Das hier im Skript anpassen!
+# =============================================================================
+CHALLENGE_INPUT = "Welche Häuser gibt es in Hogwarts und wofür stehen sie?"
+
+# =============================================================================
 # 🛠️ TEIL 1: TOOLS (WERKZEUGE)
 # =============================================================================
 # Hier definieren wir die Fähigkeiten, die unsere Agenten nutzen können.

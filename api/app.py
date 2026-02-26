@@ -1,4 +1,16 @@
+import os
+
+# Disable CrewAI telemetry (prevents timeout to app.crewai.com)
+os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
+os.environ["OTEL_SDK_DISABLED"] = "true"
+
+import asyncio
+import json
+import queue
+import sys
+import threading
 from typing import Optional, List
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +19,7 @@ from pydantic import BaseModel
 
 from config.settings import settings
 from src.rag_system.orchestration.factory import get_rag_pipeline
+from api.agents_router import router as agents_router
 
 app = FastAPI(title=settings.app_name)
 
@@ -19,7 +32,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Agents SSE-Router (Challenge 1–4 + JSON) ───────────────────────────────
+app.include_router(agents_router)
 
+
+# ── Bestehender RAG-Endpoint (unverändert) ────────────────────────────────
 class QueryRequest(BaseModel):
     question: str
     use_rag: bool = True
@@ -62,20 +79,15 @@ async def ingest_documents(
 @app.post("/query")
 async def query_endpoint(request: QueryRequest):
     try:
-        # Pipeline loads defaults from settings
         pipeline = get_rag_pipeline()
-
         if request.stream:
             return StreamingResponse(
-                pipeline.stream_query(
-                    request.question, use_rag=request.use_rag
-                ),
+                pipeline.stream_query(request.question, use_rag=request.use_rag),
                 media_type="text/plain",
             )
         else:
             answer = pipeline.query(request.question, use_rag=request.use_rag)
             return {"answer": answer}
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
