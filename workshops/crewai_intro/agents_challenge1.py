@@ -149,6 +149,31 @@ def create_tasks(challenge_input, agent_researcher, agent_writer):
 
 
 # =============================================================================
+# ⚙️  CHALLENGE KONFIGURATION
+# =============================================================================
+challenges = [
+    {
+        "id": 1,
+        "input": "Was ist ein Vector Store?",
+        "expected_key_points": ["Datenbank für Vektoren/Embeddings", "Ermöglicht Ähnlichkeitssuche", "Wichtig für RAG"]
+    },
+    {
+        "id": 2,
+        "input": "Erkläre Retrieval Augmented Generation (RAG).",
+        "expected_key_points": ["Kombination von Retrieval und Generierung", "Faktenwissen aus externer Quelle", "Reduziert Halluzinationen"]
+    },
+    {
+        "id": 3,
+        "input": "Welche Häuser gibt es in Hogwarts und wofür stehen sie?",
+        "expected_key_points": ["Gryffindor (Mut)", "Hufflepuff (Treue)", "Ravenclaw (Weisheit)", "Slytherin (List)"]
+    }
+]
+
+# CHALLENGE_INPUT wird vom API-Router genutzt
+CHALLENGE_INPUT = challenges[0]["input"]
+
+
+# =============================================================================
 # 🚀 TEIL 4: FLOW CONTROL & AUSFÜHRUNG
 # =============================================================================
 
@@ -156,20 +181,9 @@ def run_challenge(challenge_input: str):
     """
     Baut die Crew und führt sie aus.
     """
-    
-    # 1. Agenten erstellen
     researcher, writer = create_agents()
-    
-    # 2. Aufgaben erstellen
     t_research, t_write = create_tasks(challenge_input, researcher, writer)
     
-    # 3. Crew zusammenstellen
-    """
-    INFO: CREW PARAMETER
-    --------------------
-    process=Process.sequential  -> Aufgaben der Reihe nach (Standard).
-    process=Process.hierarchical-> Ein 'Manager' Agent (autom.) verteilt Aufgaben.
-    """
     crew = Crew(
         agents=[researcher, writer],
         tasks=[t_research, t_write],
@@ -177,12 +191,10 @@ def run_challenge(challenge_input: str):
         verbose=True
     )
 
-    # 4. Starten
     result = crew.kickoff()
     return result
 
 
 if __name__ == "__main__":
     c_input = CHALLENGE_INPUT
-        
     run_challenge(c_input)
