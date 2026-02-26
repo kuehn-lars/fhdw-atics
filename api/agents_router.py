@@ -14,8 +14,6 @@ Endpoints:
     POST /agents/challenge1
     POST /agents/challenge2
     POST /agents/challenge3
-    POST /agents/challenge4
-    POST /agents/challenge-json
 
 Output Format (NDJSON – ein JSON pro Zeile):
     {"type": "status", "message": "Starte Challenge: 'Was ist RAG?'"}
@@ -176,8 +174,4 @@ async def challenge2():
 async def challenge3():
     return await _make_endpoint("agents_challenge3.py")()
 
-
-@router.post("/challenge4", summary="Challenge 4 – Web + DB + Analyst (Tools)")
-async def challenge4():
-    return await _make_endpoint("agents_challenge4_tools.py")()
 
