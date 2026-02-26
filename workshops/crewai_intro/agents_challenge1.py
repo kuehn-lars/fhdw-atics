@@ -20,11 +20,6 @@ os.environ["OPENAI_API_KEY"] = "NA"
 my_llm = f"openai/{settings.local_model}"
 
 # =============================================================================
-# ⚙️  KONFIGURATION – Das hier im Skript anpassen!
-# =============================================================================
-CHALLENGE_INPUT = "Was ist ein Vector Store?"
-
-# =============================================================================
 # 🛠️ TEIL 1: TOOLS (WERKZEUGE)
 # =============================================================================
 # Hier definieren wir die Fähigkeiten, die unsere Agenten nutzen können.
@@ -188,28 +183,6 @@ def run_challenge(challenge_input: str):
 
 
 if __name__ == "__main__":
-    # --- DUMMY INPUT / OUTPUT DATEN FÜR CHALLENGE 1 ---
-    # Hier definieren wir Testfälle, um zu prüfen, ob die Agenten gute Arbeit leisten.
-    
-    challenges = [
-        {
-            "id": 1,
-            "input": "Was ist ein Vector Store?",
-            "expected_key_points": ["Datenbank für Vektoren/Embeddings", "Ermöglicht Ähnlichkeitssuche", "Wichtig für RAG"]
-        },
-        {
-            "id": 2,
-            "input": "Erkläre Retrieval Augmented Generation (RAG).",
-            "expected_key_points": ["Kombination von Retrieval und Generierung", "Faktenwissen aus externer Quelle", "Reduziert Halluzinationen"]
-        },
-        {
-            "id": 3,
-            "input": "Welche Häuser gibt es in Hogwarts und wofür stehen sie?",
-            "expected_key_points": ["Gryffindor (Mut)", "Hufflepuff (Treue)", "Ravenclaw (Weisheit)", "Slytherin (List)"]
-        }
-    ]
-
-    c_input = challenges[0]["input"]
-    c_expected = challenges[0]["expected_key_points"]
+    c_input = CHALLENGE_INPUT
         
     run_challenge(c_input)
