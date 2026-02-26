@@ -13,7 +13,8 @@ class Settings(BaseSettings):
 
     # Model Selection
     openai_model: str = "gpt-3.5-turbo"
-    local_model: str = "qwen2.5:0.5b"
+    local_model: str = "qwen3:4b"
+    embeddings_model: str = "qwen2.5:0.5b"
     nvidia_model: str = "meta/llama-3.2-3b-instruct"
 
     # API Keys

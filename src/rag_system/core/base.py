@@ -24,11 +24,11 @@ class DocumentLoader():
 
 class Embedder():
     def embed_text(self, text: str) -> List[float]:
-        client = OllamaEmbeddings(model=settings.local_model)
+        client = OllamaEmbeddings(model=settings.embeddings_model)
         return client.embed_query(text)
 
     def embed_documents(self, documents: List[str]) -> List[List[float]]:
-        client = OllamaEmbeddings(model=settings.local_model)
+        client = OllamaEmbeddings(model=settings.embeddings_model)
         return client.embed_documents(documents)
 
 class VectorStore(ABC):

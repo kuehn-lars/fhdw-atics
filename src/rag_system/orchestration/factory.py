@@ -28,7 +28,7 @@ def get_rag_pipeline(
 
         class LocalEmbedderModule:
             def __init__(self):
-                self.embedder = OllamaEmbeddings(model=settings.local_model)
+                self.embedder = OllamaEmbeddings(model=settings.embeddings_model)
 
             def embed_text(self, text):
                 return self.embedder.embed_query(text)

@@ -52,27 +52,49 @@ async def ingest_documents(
     collection_name: Optional[str] = Form(None)
 ):
     """
-    Endpoint to upload files (PDFs, TXT, etc.) to the RAG vector store.
+    Endpoint to upload files (PDFs, TXT, etc.) to the RAG vector store
+    and persist them in a specific folder on disk.
     """
+
     pipeline = get_rag_pipeline()
+
+    # Zielordner definieren (z.B. konfigurierbar machen)
+    upload_dir = settings.documents_path
+    os.makedirs(upload_dir, exist_ok=True)
+
     try:
         results = []
+
         for file in files:
-            # Read file content
+            # Dateiinhalt lesen
             content = await file.read()
-            
-            # Pass to your pipeline logic
-            # Note: You might need to save to a temp file or pass bytes 
-            # depending on how your get_rag_pipeline is implemented.
+
+            # Speicherpfad erzeugen
+            file_path = os.path.join(upload_dir, file.filename)
+
+            # Datei physisch speichern
+            with open(file_path, "wb") as f:
+                f.write(content)
+
+            # Danach wie bisher in Pipeline ingestieren
             status = pipeline.ingest(
                 file_name=file.filename,
                 content=content,
                 collection=collection_name
             )
-            results.append({"file": file.filename, "status": "success"})
-            
-        return {"message": "Ingestion complete", "details": results}
-    
+
+            results.append({
+                "file": file.filename,
+                "saved_to": file_path,
+                "status": "success"
+            })
+
+        return {
+            "message": "Ingestion complete",
+            "saved_directory": upload_dir,
+            "details": results
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
 
