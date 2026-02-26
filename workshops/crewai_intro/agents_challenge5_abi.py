@@ -1,40 +1,44 @@
 """
-CHALLENGE 5 - ABI MISSION PLANNER
-=================================
+CHALLENGE 5 - ABI STOCK ANALYSIS MISSION
+========================================
 
 Ziel:
-Ein Abi-Team plant eine "klimaneutrale Projektwoche" fuer die Schule.
-Die Loesung muss fachlich korrekt, finanziell realistisch, didaktisch sinnvoll
-und organisatorisch umsetzbar sein.
+Ein Abi-Kurs (Wirtschaft) soll ein kleines Aktien-Portfolio fuer ein
+Schulprojekt bauen. Die Loesung muss datenbasiert, rechnerisch sauber,
+risikobewusst und praesentierbar sein.
 
-Warum mindestens 6 Agenten?
-- Faktencheck braucht externe Recherche-Tools.
-- Budgetrechnung braucht mathematische Verifikation.
-- Zeitplanung braucht Constraint-Optimierung.
-- Didaktik braucht paedagogische Ableitung aus den Ergebnissen.
-- Risikoanalyse braucht ein separates Sicherheits- und Umsetzungs-Review.
-- Finales Reporting braucht konsistente Zusammenfuehrung aller Artefakte.
-Ein einzelner Agent ohne diese Spezialisierung und Zwischenabnahmen soll die
-Aufgabe nicht loesen.
+Warum 6+ Agenten?
+- Quellen/Faktencheck von Markt-Behauptungen
+- Fundamentalanalyse und Kennzahlenrechnung
+- Portfolio-Allokation unter harten Limits
+- Risiko- und Szenarioanalyse
+- Didaktische Uebersetzung fuer Abi-Niveau
+- Finales Reporting als sauberes JSON
+Diese Schritte sind absichtlich getrennt, damit kein Einzelagent die Aufgabe
+alleine "durchraten" kann.
 
-INPUT FORMAT (ChallengeInput):
+INPUT FORMAT (StockChallengeInput):
 {
   "challenge_name": str,
   "team_name": str,
   "grade_level": str,
-  "participants": int,
-  "total_budget_eur": float,
-  "max_hours_total": int,
+  "capital_eur": float,
+  "investment_horizon_months": int,
+  "risk_profile": "defensiv" | "ausgewogen" | "offensiv",
+  "max_single_position_pct": int,
   "hard_constraints": [str, ...],
-  "module_pool": [
+  "company_universe": [
     {
-      "module_id": str,
-      "title": str,
-      "duration_hours": int,
-      "cost_eur": float,
-      "co2_reduction_points": int,
-      "skill_focus": [str, ...],
-      "required_room": str
+      "ticker": str,
+      "name": str,
+      "sector": str,
+      "price_eur": float,
+      "pe_ratio": float,
+      "eps_growth_pct": float,
+      "debt_to_equity": float,
+      "volatility_1y_pct": float,
+      "dividend_yield_pct": float,
+      "esg_score": int
     }, ...
   ],
   "claims_to_verify": [
@@ -48,18 +52,18 @@ INPUT FORMAT (ChallengeInput):
   "output_language": "de" | "en"
 }
 
-OUTPUT FORMAT (AbiMissionReport / JSON):
+OUTPUT FORMAT (StockMissionReport / JSON):
 {
   "challenge_name": str,
   "team_name": str,
-  "selected_modules": [...],
-  "excluded_module_ids": [...],
+  "selected_stocks": [...],
+  "excluded_tickers": [...],
   "verified_claims": [...],
-  "budget_plan": {...},
-  "schedule": [...],
-  "pedagogical_strategy": str,
-  "communication_pitch": str,
+  "allocation_plan": {...},
+  "scenario_analysis": [...],
   "risk_register": [...],
+  "didactic_explanation": str,
+  "decision_pitch": str,
   "quality_checks": [...],
   "why_not_single_agent": [...],
   "final_recommendation": str
@@ -83,7 +87,6 @@ from crewai import Agent, Crew, Process, Task
 
 from config.settings import settings
 from workshops.crewai_intro.tools import (
-    datetime_tool,
     json_formatter_tool,
     math_tool,
     python_repl_tool,
@@ -95,14 +98,17 @@ from workshops.crewai_intro.tools import (
 my_llm = f"openai/{settings.local_model}"
 
 
-class ModuleOption(BaseModel):
-    module_id: str = Field(..., description="Eindeutige Kennung des Moduls")
-    title: str = Field(..., description="Titel des Moduls")
-    duration_hours: int = Field(..., ge=1, le=8)
-    cost_eur: float = Field(..., ge=0)
-    co2_reduction_points: int = Field(..., ge=0, le=100)
-    skill_focus: List[str] = Field(..., min_length=1)
-    required_room: str = Field(..., description="Raumanforderung")
+class CompanyOption(BaseModel):
+    ticker: str
+    name: str
+    sector: str
+    price_eur: float = Field(..., gt=0)
+    pe_ratio: float = Field(..., ge=0)
+    eps_growth_pct: float = Field(..., ge=-100, le=200)
+    debt_to_equity: float = Field(..., ge=0, le=10)
+    volatility_1y_pct: float = Field(..., ge=0, le=200)
+    dividend_yield_pct: float = Field(..., ge=0, le=20)
+    esg_score: int = Field(..., ge=0, le=100)
 
 
 class SourceClaim(BaseModel):
@@ -112,25 +118,26 @@ class SourceClaim(BaseModel):
     source_url: str
 
 
-class ChallengeInput(BaseModel):
+class StockChallengeInput(BaseModel):
     challenge_name: str
     team_name: str
     grade_level: str
-    participants: int = Field(..., ge=5, le=120)
-    total_budget_eur: float = Field(..., gt=0)
-    max_hours_total: int = Field(..., ge=6, le=40)
+    capital_eur: float = Field(..., gt=1000)
+    investment_horizon_months: int = Field(..., ge=6, le=60)
+    risk_profile: Literal["defensiv", "ausgewogen", "offensiv"]
+    max_single_position_pct: int = Field(..., ge=10, le=60)
     hard_constraints: List[str] = Field(..., min_length=3)
-    module_pool: List[ModuleOption] = Field(..., min_length=6)
+    company_universe: List[CompanyOption] = Field(..., min_length=6)
     claims_to_verify: List[SourceClaim] = Field(..., min_length=4)
     output_language: Literal["de", "en"] = "de"
 
     @model_validator(mode="after")
     def validate_complexity(self):
-        unique_rooms = {m.required_room for m in self.module_pool}
-        if len(unique_rooms) < 2:
-            raise ValueError("Es werden mindestens zwei unterschiedliche Raeume benoetigt.")
-        if not any("budget" in c.lower() or "kosten" in c.lower() for c in self.hard_constraints):
-            raise ValueError("Mindestens eine harte Budget-/Kostenbedingung fehlt.")
+        sectors = {c.sector for c in self.company_universe}
+        if len(sectors) < 3:
+            raise ValueError("Mindestens 3 verschiedene Sektoren noetig.")
+        if not any("max" in c.lower() or "position" in c.lower() for c in self.hard_constraints):
+            raise ValueError("Mindestens eine Positionsgrenze in hard_constraints fehlt.")
         return self
 
 
@@ -141,30 +148,28 @@ class VerifiedClaim(BaseModel):
     used_tool: Literal["wikipedia_tool", "web_scraper_tool", "both", "none"]
 
 
-class SelectedModule(BaseModel):
-    module_id: str
-    title: str
-    planned_hours: int = Field(..., ge=1, le=8)
-    planned_cost_eur: float = Field(..., ge=0)
-    abi_competency: str
-    rationale: str
+class SelectedStock(BaseModel):
+    ticker: str
+    name: str
+    weight_pct: float = Field(..., ge=0, le=100)
+    investment_eur: float = Field(..., ge=0)
+    investment_thesis: str
+    key_metric_note: str
 
 
-class BudgetPlan(BaseModel):
-    budget_limit_eur: float = Field(..., ge=0)
-    planned_total_eur: float = Field(..., ge=0)
-    remaining_eur: float
-    reserve_ratio: float = Field(..., ge=0, le=1)
-    cost_per_student_eur: float = Field(..., ge=0)
+class AllocationPlan(BaseModel):
+    capital_eur: float = Field(..., gt=0)
+    invested_eur: float = Field(..., ge=0)
+    cash_reserve_eur: float = Field(..., ge=0)
+    cash_reserve_pct: float = Field(..., ge=0, le=100)
+    weighted_avg_pe: float = Field(..., ge=0)
+    weighted_avg_volatility_pct: float = Field(..., ge=0)
 
 
-class ScheduleSlot(BaseModel):
-    day: int = Field(..., ge=1, le=5)
-    start: str = Field(..., description="Format HH:MM")
-    end: str = Field(..., description="Format HH:MM")
-    module_id: str
-    room: str
-    facilitator_agent: str
+class ScenarioResult(BaseModel):
+    scenario: Literal["bull", "base", "bear"]
+    expected_portfolio_return_pct: float = Field(..., ge=-100, le=200)
+    assumption: str
 
 
 class RiskItem(BaseModel):
@@ -175,17 +180,17 @@ class RiskItem(BaseModel):
     owner: str
 
 
-class AbiMissionReport(BaseModel):
+class StockMissionReport(BaseModel):
     challenge_name: str
     team_name: str
-    selected_modules: List[SelectedModule] = Field(..., min_length=3)
-    excluded_module_ids: List[str]
+    selected_stocks: List[SelectedStock] = Field(..., min_length=3)
+    excluded_tickers: List[str]
     verified_claims: List[VerifiedClaim] = Field(..., min_length=4)
-    budget_plan: BudgetPlan
-    schedule: List[ScheduleSlot] = Field(..., min_length=3)
-    pedagogical_strategy: str
-    communication_pitch: str
+    allocation_plan: AllocationPlan
+    scenario_analysis: List[ScenarioResult] = Field(..., min_length=3)
     risk_register: List[RiskItem] = Field(..., min_length=4)
+    didactic_explanation: str
+    decision_pitch: str
     quality_checks: List[str] = Field(..., min_length=6)
     why_not_single_agent: List[str] = Field(..., min_length=6)
     final_recommendation: str
@@ -194,15 +199,12 @@ class AbiMissionReport(BaseModel):
 def create_agents():
     input_architect = Agent(
         role="Input-Architekt",
-        goal=(
-            "Normalisiere den Challenge-Input in eine klare Datengrundlage mit "
-            "verwertbaren Constraints fuer die Folgeagenten."
-        ),
+        goal="Normalisiere den Input und extrahiere harte, maschinenlesbare Constraints.",
         backstory=(
-            "Du arbeitest wie ein Datenarchitekt in einem Schulprojekt-Team und "
-            "lieferst die verbindliche Struktur fuer alle Folgeentscheidungen."
+            "Du bist der Daten-Moderator der Boersen-AG und sorgst fuer eine "
+            "klare Ausgangsbasis fuer alle Folgeagenten."
         ),
-        tools=[json_formatter_tool, text_summarizer_tool, datetime_tool],
+        tools=[json_formatter_tool, text_summarizer_tool],
         llm=my_llm,
         verbose=True,
         allow_delegation=False,
@@ -210,14 +212,14 @@ def create_agents():
     )
 
     fact_checker = Agent(
-        role="Fakten- und Quellenpruefer",
+        role="Quellen- und Faktenpruefer",
         goal=(
-            "Pruefe alle Claims mit Wikipedia und ggf. Originalquelle und gib "
-            "fuer jeden Claim ein belastbares Urteil ab."
+            "Pruefe Marktaussagen mit Wikipedia und Webquellen und liefere "
+            "pro Claim ein nachvollziehbares Urteil."
         ),
         backstory=(
-            "Du bist Recherche-Lead und kennzeichnest Behauptungen nur dann als "
-            "korrekt, wenn die Evidenz belastbar ist."
+            "Du arbeitest wie ein Research-Analyst. Ohne belastbare Quelle wird "
+            "kein Claim als korrekt akzeptiert."
         ),
         tools=[wikipedia_tool, web_scraper_tool, text_summarizer_tool],
         llm=my_llm,
@@ -226,15 +228,15 @@ def create_agents():
         max_iter=10,
     )
 
-    budget_analyst = Agent(
-        role="Budget- und Matheanalyst",
+    fundamental_analyst = Agent(
+        role="Fundamentalanalyst",
         goal=(
-            "Waehle ein kostenrealistisches Modulpaket, berechne Kennzahlen und "
-            "halte alle Budgetgrenzen strikt ein."
+            "Bewerte Unternehmen anhand Kennzahlen (PE, Wachstum, Verschuldung, "
+            "Volatilitaet, ESG) und identifiziere Kandidaten."
         ),
         backstory=(
-            "Du bist Mathe-LK-Tutor und kaufmaennischer Planer. Jeder Betrag muss "
-            "nachvollziehbar gerechnet sein."
+            "Du bist Mathe- und Wirtschaftsprofi. Jede Auswahl muss sich in den "
+            "Zahlen begruenden lassen."
         ),
         tools=[math_tool, python_repl_tool, json_formatter_tool],
         llm=my_llm,
@@ -243,32 +245,49 @@ def create_agents():
         max_iter=10,
     )
 
-    schedule_optimizer = Agent(
-        role="Stundenplan-Optimierer",
+    portfolio_optimizer = Agent(
+        role="Portfolio-Optimierer",
         goal=(
-            "Erzeuge einen konfliktfreien Ablaufplan (Tag, Uhrzeit, Raum), der "
-            "zu Budget, Dauer und Hard Constraints passt."
+            "Berechne eine Allokation mit Positionslimits, Cash-Reserve und "
+            "risikoprofilgerechter Verteilung."
         ),
         backstory=(
-            "Du koordinierst Schulprojekte und bist spezialisiert auf robuste "
-            "Zeit- und Raumplanung mit mehreren Abhaengigkeiten."
+            "Du optimierst Portfolios unter harten Nebenbedingungen und lieferst "
+            "einen umsetzbaren Verteilungsplan."
         ),
-        tools=[python_repl_tool, datetime_tool, json_formatter_tool],
+        tools=[python_repl_tool, math_tool, json_formatter_tool],
         llm=my_llm,
         verbose=True,
         allow_delegation=False,
         max_iter=10,
     )
 
-    pedagogy_coach = Agent(
-        role="Didaktik-Coach",
+    risk_manager = Agent(
+        role="Risiko- und Szenario-Manager",
         goal=(
-            "Uebersetze das fachliche Ergebnis in einen starken Abi-Lernplan mit "
-            "klaren Kompetenzzielen und motivierender Kommunikation."
+            "Erzeuge Bull/Base/Bear Szenarien und ein Risiko-Register mit klaren "
+            "Massnahmen und Verantwortlichkeiten."
         ),
         backstory=(
-            "Du bist Lehrer und Curriculum-Coach. Du machst aus Daten und Fakten "
-            "eine Lernstrategie, die in der Schule wirklich funktioniert."
+            "Du bist verantwortlich dafuer, dass der Plan nicht nur gut aussieht, "
+            "sondern auch in schlechten Marktphasen standhaelt."
+        ),
+        tools=[python_repl_tool, web_scraper_tool, text_summarizer_tool],
+        llm=my_llm,
+        verbose=True,
+        allow_delegation=False,
+        max_iter=10,
+    )
+
+    didactic_coach = Agent(
+        role="Didaktik-Coach",
+        goal=(
+            "Uebersetze die Analyse in eine Abi-verstaendliche Erklaerung und "
+            "einen praegnanten Pitch fuer die Klasse."
+        ),
+        backstory=(
+            "Du bist Lehrkraft fuer Wirtschaft und machst aus komplexer Analyse "
+            "eine klare Lernbotschaft."
         ),
         tools=[text_summarizer_tool, wikipedia_tool],
         llm=my_llm,
@@ -277,32 +296,15 @@ def create_agents():
         max_iter=8,
     )
 
-    risk_manager = Agent(
-        role="Risiko- und Umsetzungsmanager",
-        goal=(
-            "Identifiziere die groessten Projekt-Risiken und liefere pro Risiko "
-            "konkrete Gegenmassnahmen und Verantwortlichkeiten."
-        ),
-        backstory=(
-            "Du arbeitest wie ein PMO-Lead: kein Plan geht live ohne sauberes "
-            "Risiko-Register."
-        ),
-        tools=[web_scraper_tool, text_summarizer_tool, json_formatter_tool],
-        llm=my_llm,
-        verbose=True,
-        allow_delegation=False,
-        max_iter=8,
-    )
-
     final_editor = Agent(
-        role="Abschlussredakteur",
+        role="Final-Reporter",
         goal=(
-            "Fuehre alle Teilresultate konsistent zu einem finalen JSON-Bericht "
-            "im AbiMissionReport-Format zusammen."
+            "Fuehre alle Teilresultate zu einem konsistenten, validen JSON im "
+            "StockMissionReport-Format zusammen."
         ),
         backstory=(
-            "Du bist verantwortlich fuer den finalen Abgabebericht. Das Ergebnis "
-            "muss fachlich konsistent, valide und direkt praesentierbar sein."
+            "Du verantwortest die finale Abgabe. Nur saubere Struktur und "
+            "konsistente Zahlen werden akzeptiert."
         ),
         tools=[json_formatter_tool, python_repl_tool, text_summarizer_tool],
         llm=my_llm,
@@ -314,22 +316,22 @@ def create_agents():
     return (
         input_architect,
         fact_checker,
-        budget_analyst,
-        schedule_optimizer,
-        pedagogy_coach,
+        fundamental_analyst,
+        portfolio_optimizer,
         risk_manager,
+        didactic_coach,
         final_editor,
     )
 
 
-def create_tasks(challenge_input: ChallengeInput, agents: tuple) -> list:
+def create_tasks(challenge_input: StockChallengeInput, agents: tuple) -> list:
     (
         input_architect,
         fact_checker,
-        budget_analyst,
-        schedule_optimizer,
-        pedagogy_coach,
+        fundamental_analyst,
+        portfolio_optimizer,
         risk_manager,
+        didactic_coach,
         final_editor,
     ) = agents
 
@@ -337,254 +339,265 @@ def create_tasks(challenge_input: ChallengeInput, agents: tuple) -> list:
 
     task_input_design = Task(
         description=f"""
-        Erzeuge eine normalisierte Arbeitsgrundlage aus folgendem Input:
+        Analysiere und normalisiere den Input:
         {input_json}
 
         Liefere:
-        1) Eine kompakte Constraint-Liste (max 10 Punkte)
-        2) Eine modulare Tabelle (module_id, stunden, kosten, raum, co2_punkte)
-        3) Explizite no-go Regeln aus den Hard Constraints
-        4) Ein Datenqualitaetsfazit (1-2 Saetze)
+        1) Harte Constraints (max 10 Bullet Points)
+        2) Kennzahlen-Tabelle aller Unternehmen
+        3) No-Go Regeln fuer die Portfolio-Optimierung
         """,
-        expected_output=(
-            "Constraint-Liste, Modultabelle, no-go Regeln, Datenqualitaetsfazit."
-        ),
+        expected_output="Constraint-Liste, Kennzahlen-Tabelle, No-Go Regeln.",
         agent=input_architect,
     )
 
     task_fact_check = Task(
         description=f"""
-        Pruefe alle Claims aus dem Input mit Tools.
+        Pruefe alle Claims im Input mit Tools.
         Input:
         {input_json}
 
         Fuer jeden Claim:
         - claim_id
         - verdict: korrekt/unsicher/falsch
-        - kurze Evidenz
+        - evidence
         - used_tool: wikipedia_tool/web_scraper_tool/both/none
 
-        Kein Claim darf ausgelassen werden.
+        Kein Claim darf fehlen.
         """,
-        expected_output="Vollstaendige Claim-Pruefung mit Urteil und Evidenz je claim_id.",
+        expected_output="Vollstaendige Claim-Pruefung fuer alle claim_id.",
         agent=fact_checker,
         context=[task_input_design],
     )
 
-    task_budget = Task(
+    task_fundamental = Task(
         description="""
-        Nutze die Input-Analyse und den Faktencheck:
-        - Waehle mindestens 3 Module aus.
-        - Summe der Modulstunden darf max_hours_total nicht ueberschreiten.
-        - Summe der Kosten darf total_budget_eur nicht ueberschreiten.
-        - Berechne reserve_ratio und cost_per_student_eur.
-        - Liste auch ausgeschlossene Module mit kurzem Grund auf.
+        Erstelle ein Ranking der Aktien aus company_universe:
+        - Begruende Auswahl/Abwahl mit Kennzahlen
+        - Markiere mindestens 3 starke und mindestens 2 schwache Kandidaten
+        - Keine finale Gewichtung hier, nur qualitative und quantitative Voranalyse
         """,
-        expected_output=(
-            "Ausgewaehlte Module mit Kosten/Stunden, ausgeschlossene Module, "
-            "vollstaendiger BudgetPlan."
-        ),
-        agent=budget_analyst,
+        expected_output="Fundamentales Ranking mit Starken, Schwachen und Gruenden.",
+        agent=fundamental_analyst,
         context=[task_input_design, task_fact_check],
     )
 
-    task_schedule = Task(
+    task_allocation = Task(
         description="""
-        Erzeuge auf Basis der Budgetauswahl einen umsetzbaren Ablaufplan:
-        - mind. 3 Schedule-Slots
-        - format: day(1-5), start(HH:MM), end(HH:MM), module_id, room
-        - keine Raumkonflikte am gleichen Tag/Zeitslot
-        - Stundenbudget darf nicht ueberschritten werden
+        Erzeuge eine finale Allokation:
+        - Mindestens 3 Aktien auswaehlen
+        - Jede Position <= max_single_position_pct
+        - Summe der Gewichte <= 100%
+        - invested_eur <= capital_eur
+        - Cash-Reserve ausweisen
+        - weighted_avg_pe und weighted_avg_volatility_pct berechnen
         """,
-        expected_output="Konfliktfreier Ablaufplan mit day/start/end/module_id/room.",
-        agent=schedule_optimizer,
-        context=[task_input_design, task_budget],
-    )
-
-    task_didactic = Task(
-        description="""
-        Entwickle eine Abi-taugliche Lern- und Kommunikationsstrategie:
-        - pedagogical_strategy: 1 klarer Absatz
-        - communication_pitch: max 120 Woerter fuer Schulleitung + Mitschueler
-        - Verknuepfe die ausgewaehlten Module mit konkreten Abi-Kompetenzen
-        """,
-        expected_output="Didaktische Strategie, Pitch und Kompetenzmapping.",
-        agent=pedagogy_coach,
-        context=[task_input_design, task_fact_check, task_budget, task_schedule],
+        expected_output="Ausgewaehlte Aktien mit Gewichtung und vollstaendiger AllocationPlan.",
+        agent=portfolio_optimizer,
+        context=[task_input_design, task_fact_check, task_fundamental],
     )
 
     task_risk = Task(
         description="""
-        Erstelle ein Risiko-Register mit mindestens 4 Risiken:
-        - risk
-        - probability: niedrig/mittel/hoch
-        - impact: niedrig/mittel/hoch
-        - mitigation
-        - owner
-
-        Risiken sollen organisatorisch UND inhaltlich sein.
+        Erstelle:
+        1) Szenarioanalyse mit bull/base/bear (jeweils erwartete Portfoliorendite)
+        2) Risiko-Register mit mindestens 4 Risiken
+           (probability, impact, mitigation, owner)
         """,
-        expected_output="Risiko-Register mit mindestens 4 vollstaendigen Eintraegen.",
+        expected_output="Szenarioanalyse und Risiko-Register.",
         agent=risk_manager,
-        context=[task_input_design, task_budget, task_schedule, task_didactic],
+        context=[task_input_design, task_allocation, task_fact_check],
+    )
+
+    task_didactic = Task(
+        description="""
+        Erzeuge:
+        - didactic_explanation: kurze, klare Abi-Erklaerung (6-10 Saetze)
+        - decision_pitch: max 120 Woerter fuer 2-min Vorstellung in der Klasse
+        """,
+        expected_output="Didaktische Erklaerung und Pitch.",
+        agent=didactic_coach,
+        context=[task_input_design, task_fundamental, task_allocation, task_risk],
     )
 
     task_final_report = Task(
         description=f"""
-        Erzeuge den finalen Bericht als valides JSON gemaess AbiMissionReport.
-        Nutze alle vorigen Task-Outputs.
+        Erzeuge den finalen Bericht als valides JSON gemaess StockMissionReport.
+        Nutze alle bisherigen Task-Ergebnisse.
 
-        Zwingend enthalten:
+        Zwingend:
         - challenge_name = "{challenge_input.challenge_name}"
         - team_name = "{challenge_input.team_name}"
-        - mindestens 3 selected_modules
-        - alle claims_to_verify aus Input als verified_claims
-        - budget_plan inklusive reserve_ratio
-        - konfliktfreie schedule-Liste
-        - mindestens 4 risk_register Eintraege
-        - quality_checks: mindestens 6 konkrete Checks
-        - why_not_single_agent: mindestens 6 konkrete Gruende, je Rolle ein Grund
-        - final_recommendation: klare Entscheidung mit 2-4 Saetzen
+        - mindestens 3 selected_stocks
+        - alle claims_to_verify als verified_claims
+        - allocation_plan mit invested/cash/weighted averages
+        - scenario_analysis mit bull/base/bear
+        - risk_register mit mindestens 4 Eintraegen
+        - quality_checks mit mindestens 6 konkreten Checks
+        - why_not_single_agent mit mindestens 6 konkreten Gruenden
+        - final_recommendation mit klarer Entscheidung (2-4 Saetze)
 
-        Gib nur den finalen JSON-Bericht aus.
+        Ausgabe nur als JSON.
         """,
-        expected_output="Vollstaendiger AbiMissionReport als JSON.",
+        expected_output="Vollstaendiger StockMissionReport als JSON.",
         agent=final_editor,
         context=[
             task_input_design,
             task_fact_check,
-            task_budget,
-            task_schedule,
-            task_didactic,
+            task_fundamental,
+            task_allocation,
             task_risk,
+            task_didactic,
         ],
-        output_pydantic=AbiMissionReport,
+        output_pydantic=StockMissionReport,
     )
 
     return [
         task_input_design,
         task_fact_check,
-        task_budget,
-        task_schedule,
-        task_didactic,
+        task_fundamental,
+        task_allocation,
         task_risk,
+        task_didactic,
         task_final_report,
     ]
 
 
-def _validate_input(challenge_input) -> ChallengeInput:
-    if isinstance(challenge_input, ChallengeInput):
+def _validate_input(challenge_input) -> StockChallengeInput:
+    if isinstance(challenge_input, StockChallengeInput):
         return challenge_input
     try:
-        return ChallengeInput.model_validate(challenge_input)
+        return StockChallengeInput.model_validate(challenge_input)
     except ValidationError as exc:
-        raise ValueError(f"Ungueltiges ChallengeInput-Format:\n{exc}") from exc
+        raise ValueError(f"Ungueltiges StockChallengeInput-Format:\n{exc}") from exc
 
 
 challenges = [
     {
         "id": 1,
-        "challenge_name": "Klimaneutrale Abi-Projektwoche 2026",
-        "team_name": "Q2 Umweltkurs",
+        "challenge_name": "Abi Boersen-AG: Portfolio Challenge 2026",
+        "team_name": "Q2 Wirtschaftskurs",
         "grade_level": "Q2",
-        "participants": 28,
-        "total_budget_eur": 3200.0,
-        "max_hours_total": 16,
+        "capital_eur": 12000.0,
+        "investment_horizon_months": 18,
+        "risk_profile": "ausgewogen",
+        "max_single_position_pct": 35,
         "hard_constraints": [
-            "Kosten muessen innerhalb des Budgets bleiben",
-            "Mindestens ein Experiment und ein Debattenformat enthalten",
-            "Alle Module muessen ohne externe Uebernachtung umsetzbar sein",
-            "Plan muss der Schulleitung in 5 Minuten praesentierbar sein",
+            "Keine einzelne Position darf ueber max_single_position_pct liegen",
+            "Mindestens 3 verschiedene Sektoren im Endportfolio",
+            "Mindestens 10% Cash Reserve behalten",
+            "Finaler Pitch muss in 2 Minuten vortragbar sein",
         ],
-        "module_pool": [
+        "company_universe": [
             {
-                "module_id": "M1",
-                "title": "CO2-Fussabdruck Workshop",
-                "duration_hours": 3,
-                "cost_eur": 380.0,
-                "co2_reduction_points": 45,
-                "skill_focus": ["Datenkompetenz", "Alltagsbezug", "Reflexion"],
-                "required_room": "Computerraum",
+                "ticker": "SAP",
+                "name": "SAP SE",
+                "sector": "Software",
+                "price_eur": 178.0,
+                "pe_ratio": 42.0,
+                "eps_growth_pct": 16.0,
+                "debt_to_equity": 0.25,
+                "volatility_1y_pct": 24.0,
+                "dividend_yield_pct": 1.0,
+                "esg_score": 74,
             },
             {
-                "module_id": "M2",
-                "title": "Debatte: Klima, Wirtschaft, Gerechtigkeit",
-                "duration_hours": 2,
-                "cost_eur": 120.0,
-                "co2_reduction_points": 15,
-                "skill_focus": ["Argumentation", "Urteilsbildung"],
-                "required_room": "Aula",
+                "ticker": "SIE",
+                "name": "Siemens AG",
+                "sector": "Industrie",
+                "price_eur": 182.0,
+                "pe_ratio": 19.0,
+                "eps_growth_pct": 11.0,
+                "debt_to_equity": 0.62,
+                "volatility_1y_pct": 21.0,
+                "dividend_yield_pct": 2.6,
+                "esg_score": 79,
             },
             {
-                "module_id": "M3",
-                "title": "Solar-Mini-Lab",
-                "duration_hours": 4,
-                "cost_eur": 980.0,
-                "co2_reduction_points": 70,
-                "skill_focus": ["Experiment", "Naturwissenschaft"],
-                "required_room": "Physikraum",
+                "ticker": "ASML",
+                "name": "ASML Holding",
+                "sector": "Halbleiter",
+                "price_eur": 835.0,
+                "pe_ratio": 34.0,
+                "eps_growth_pct": 20.0,
+                "debt_to_equity": 0.33,
+                "volatility_1y_pct": 29.0,
+                "dividend_yield_pct": 0.9,
+                "esg_score": 68,
             },
             {
-                "module_id": "M4",
-                "title": "Stadtklima-Mapping zu Fuss",
-                "duration_hours": 3,
-                "cost_eur": 210.0,
-                "co2_reduction_points": 35,
-                "skill_focus": ["Geographie", "Datenanalyse"],
-                "required_room": "Aussenbereich",
+                "ticker": "NESN",
+                "name": "Nestle SA",
+                "sector": "Konsum",
+                "price_eur": 97.0,
+                "pe_ratio": 21.0,
+                "eps_growth_pct": 6.0,
+                "debt_to_equity": 1.45,
+                "volatility_1y_pct": 16.0,
+                "dividend_yield_pct": 3.0,
+                "esg_score": 72,
             },
             {
-                "module_id": "M5",
-                "title": "Muellkreislauf und Circular Economy",
-                "duration_hours": 2,
-                "cost_eur": 260.0,
-                "co2_reduction_points": 30,
-                "skill_focus": ["Wirtschaft", "Nachhaltigkeit"],
-                "required_room": "Biologieraum",
+                "ticker": "OR",
+                "name": "L'Oreal SA",
+                "sector": "Konsum",
+                "price_eur": 455.0,
+                "pe_ratio": 36.0,
+                "eps_growth_pct": 12.0,
+                "debt_to_equity": 0.18,
+                "volatility_1y_pct": 20.0,
+                "dividend_yield_pct": 1.4,
+                "esg_score": 81,
             },
             {
-                "module_id": "M6",
-                "title": "Pitch-Training fuer Schulleitung",
-                "duration_hours": 2,
-                "cost_eur": 150.0,
-                "co2_reduction_points": 10,
-                "skill_focus": ["Kommunikation", "Teamarbeit"],
-                "required_room": "Aula",
+                "ticker": "ALV",
+                "name": "Allianz SE",
+                "sector": "Finanzen",
+                "price_eur": 292.0,
+                "pe_ratio": 11.0,
+                "eps_growth_pct": 9.0,
+                "debt_to_equity": 0.95,
+                "volatility_1y_pct": 18.0,
+                "dividend_yield_pct": 4.8,
+                "esg_score": 77,
             },
             {
-                "module_id": "M7",
-                "title": "Externe Exkursion Windpark",
-                "duration_hours": 6,
-                "cost_eur": 1900.0,
-                "co2_reduction_points": 80,
-                "skill_focus": ["Praxisbezug", "Technik"],
-                "required_room": "Exkursion",
+                "ticker": "AIR",
+                "name": "Airbus SE",
+                "sector": "Industrie",
+                "price_eur": 159.0,
+                "pe_ratio": 28.0,
+                "eps_growth_pct": 14.0,
+                "debt_to_equity": 0.70,
+                "volatility_1y_pct": 26.0,
+                "dividend_yield_pct": 1.2,
+                "esg_score": 66,
             },
         ],
         "claims_to_verify": [
             {
                 "claim_id": "C1",
-                "claim_text": "Deutschland will bis 2045 treibhausgasneutral sein.",
-                "source_name": "Bundesregierung",
-                "source_url": "https://www.bundesregierung.de/",
+                "claim_text": "ASML liefert EUV-Lithographiesysteme und ist technologisch schwer ersetzbar.",
+                "source_name": "ASML Investor Relations",
+                "source_url": "https://www.asml.com/en/investors",
             },
             {
                 "claim_id": "C2",
-                "claim_text": "Photovoltaik ist in Deutschland 2025 die groesste Stromquelle.",
-                "source_name": "Fraunhofer ISE",
-                "source_url": "https://www.ise.fraunhofer.de/",
+                "claim_text": "Hohe Dividendenrendite bedeutet nicht automatisch geringes Risiko.",
+                "source_name": "Investopedia",
+                "source_url": "https://www.investopedia.com/",
             },
             {
                 "claim_id": "C3",
-                "claim_text": "Methan wirkt auf 20 Jahre deutlich staerker als CO2.",
-                "source_name": "IPCC",
-                "source_url": "https://www.ipcc.ch/",
+                "claim_text": "Niedriges KGV allein reicht nicht fuer eine Kaufentscheidung.",
+                "source_name": "Wikipedia KGV",
+                "source_url": "https://de.wikipedia.org/wiki/Kurs-Gewinn-Verh%C3%A4ltnis",
             },
             {
                 "claim_id": "C4",
-                "claim_text": "Die Erwaermung seit vorindustrieller Zeit liegt bei etwa 1.1 bis 1.3 Grad.",
-                "source_name": "WMO",
-                "source_url": "https://wmo.int/",
+                "claim_text": "Diversifikation ueber mehrere Sektoren kann Portfoliorisiko senken.",
+                "source_name": "Wikipedia Diversifikation",
+                "source_url": "https://de.wikipedia.org/wiki/Diversifikation_(Wirtschaft)",
             },
         ],
         "output_language": "de",
