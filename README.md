@@ -62,41 +62,76 @@ This project can be used to:
 
 ## Getting Started
 
-1. **Install Dependencies**:
+### Prerequisites
+
+- Python 3.13 (required for compatibility)
+- Node.js and npm
+
+### Backend Setup
+
+1. **Create Virtual Environment with Python 3.13**:
+   ```bash
+   rm -rf venv && py -3.13 -m venv venv
+   ```
+
+2. **Activate Virtual Environment**:
+   ```bash
+   # Git Bash / Linux / macOS
+   source venv/Scripts/activate
+   
+   # Windows PowerShell
+   .\venv\Scripts\Activate.ps1
+   ```
+
+3. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **Configure Environment**:
-   Create a `.env` file with your keys:
-   ```env
-   OPENAI_API_KEY=your_key_here
+4. **Install Ollama**:
+   - Download from https://ollama.com/download
+   - Install and start Ollama
+
+5. **Pull the LLM Model**:
+   ```bash
+   ollama pull qwen2.5:0.5b
    ```
 
-3. **Run CLI**:
+<!-- 6. **Configure Environment** (optional):
+   Create a `.env` file with your API keys if using OpenAI or NVIDIA:
+   ```env
+   OPENAI_API_KEY=your_key_here
+   NVIDIA_API_KEY=your_key_here
+   ``` -->
+
+6. **Test CLI**:
    ```bash
    python -m cli.main --help
    ```
 
-4. **Run API**:
-
-   Start the FastAPI backend:
+7. **Start API Server**:
    ```bash
    uvicorn api.app:app --reload
    ```
-   Interactive API documentation is available at:
-   - http://localhost:8000/docs
+   Interactive API documentation: http://localhost:8000/docs
 
-5. **Run Web Frontend**
+### Frontend Setup
 
+1. **Navigate to Frontend Directory**:
    ```bash
    cd frontend
+   ```
 
-   # Install dependencies
+2. **Install Dependencies**:
+   ```bash
    npm install
+   ```
 
-   # Start development server
+3. **Start Development Server**:
+   ```bash
    npm run dev
    ```
+   
+   Frontend will be available at: http://localhost:3000
    This web application will be available at:
    - http://localhost:3000
