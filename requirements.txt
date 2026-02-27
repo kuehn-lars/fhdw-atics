@@ -17,3 +17,5 @@ torch>=2.2.0
 bitsandbytes>=0.43.0
 pytest>=8.0.0
 python-multipart>=0.0.9
+requests>=2.32.0
+matplotlib>=3.8.0

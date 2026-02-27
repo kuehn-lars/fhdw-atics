@@ -25,17 +25,20 @@ Verfügbare Tools:
     8.  JSONFormatterTool    – Formatiert Text/Dict als JSON
     9.  TextSummarizerTool   – Kürzt langen Text auf n Zeichen
     10. DirectoryListTool    – Listet Dateien in einem Verzeichnis
-    11. ShellCommandTool     – Führt sichere Shell-Befehle aus
-    12. PythonREPLTool       – Führt Python-Code aus (Sandbox)
+    11. PythonREPLTool       – Führt Python-Code aus (Sandbox)
+    12. LiveStockDataTool    – Holt aktuelle Aktienkurse (Stooq)
+    13. CurrentNewsTool      – Holt aktuelle News zu Ticker/Thema
+    14. VisualizationTool    – Erstellt einfache Visualisierungen als PNG
 """
 
+import csv
 import datetime
 import json
 import os
 import re
 import subprocess
 import sys
-from typing import ClassVar, Set
+import tempfile
 
 # Root-Pfad sicherstellen
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
@@ -388,69 +391,7 @@ class DirectoryListTool(BaseTool):
 
 
 # =============================================================================
-# 11. SHELL COMMAND TOOL
-# =============================================================================
-
-class ShellCommandTool(BaseTool):
-    """Führt sichere Shell-Befehle aus und gibt das Ergebnis zurück."""
-    name: str = "Shell Befehl"
-    description: str = (
-        "Führt einen Shell-Befehl aus und gibt stdout zurück. "
-        "Eingabe: der auszuführende Befehl als String. "
-        "⚠️ Nur sichere, nicht-destruktive Befehle sind erlaubt (ls, cat, echo, wc, head, tail, grep, find, date, whoami, pwd, uname, df, du)."
-    )
-
-    # Whitelist sicherer Befehle
-    SAFE_COMMANDS: ClassVar[Set[str]] = {
-        'ls', 'cat', 'echo', 'wc', 'head', 'tail', 'grep', 'find',
-        'date', 'whoami', 'pwd', 'uname', 'df', 'du', 'sort', 'uniq',
-        'tr', 'cut', 'awk', 'sed', 'which', 'env', 'printenv',
-        'python3', 'python', 'pip', 'git'
-    }
-
-    def _run(self, command: str) -> str:
-        # Sicherheitscheck: Erstes Wort muss in der Whitelist sein
-        first_word = command.strip().split()[0] if command.strip() else ""
-        if first_word not in self.SAFE_COMMANDS:
-            return (
-                f"⚠️ Befehl '{first_word}' ist nicht erlaubt.\n"
-                f"Erlaubte Befehle: {', '.join(sorted(self.SAFE_COMMANDS))}"
-            )
-
-        # Gefährliche Patterns blocken
-        dangerous_patterns = ['rm ', 'rm\t', 'rmdir', '> /', 'sudo', 'chmod', 'chown', 'mkfs', 'dd ']
-        if any(p in command for p in dangerous_patterns):
-            return "⚠️ Dieser Befehl enthält potenziell gefährliche Operationen und wird blockiert."
-
-        try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=15,
-                cwd=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-            )
-            output = result.stdout[:3000] if result.stdout else ""
-            errors = result.stderr[:500] if result.stderr else ""
-
-            response = f"💻 $ {command}\n"
-            if output:
-                response += f"\n{output}"
-            if errors:
-                response += f"\n⚠️ stderr:\n{errors}"
-            if result.returncode != 0:
-                response += f"\n❌ Exit Code: {result.returncode}"
-
-            return response
-        except subprocess.TimeoutExpired:
-            return f"⏰ Timeout: Befehl '{command}' hat länger als 15 Sekunden gedauert."
-        except Exception as e:
-            return f"Fehler: {e}"
-
-
-# =============================================================================
-# 12. PYTHON REPL TOOL
+# 11. PYTHON REPL TOOL
 # =============================================================================
 
 class PythonREPLTool(BaseTool):
@@ -514,6 +455,225 @@ class PythonREPLTool(BaseTool):
 
 
 # =============================================================================
+# 12. LIVE STOCK DATA TOOL
+# =============================================================================
+
+class LiveStockDataTool(BaseTool):
+    """Holt aktuelle Aktiendaten fuer eine Liste von Tickersymbolen."""
+    name: str = "Live Aktien Daten"
+    description: str = (
+        "Holt aktuelle Aktienkurse ueber Stooq. "
+        "Eingabe: kommaseparierte Ticker als String (z.B. 'MSFT,NVDA,SAP')."
+    )
+
+    def _run(self, tickers: str) -> str:
+        try:
+            import requests
+        except ImportError:
+            return "Fehler: 'requests' Paket nicht installiert."
+
+        try:
+            now_iso = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+            ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+            if not ticker_list:
+                return "⚠️ Keine Ticker uebergeben. Format: 'MSFT,NVDA,SAP'"
+
+            def symbol_candidates(ticker: str):
+                base = ticker.upper()
+                candidates = [base]
+                if "." not in base:
+                    candidates.extend([f"{base}.US", f"{base}.DE", f"{base}.SW", f"{base}.IT"])
+                dedup = []
+                for symbol in candidates:
+                    if symbol not in dedup:
+                        dedup.append(symbol)
+                return dedup
+
+            quotes = []
+            errors = []
+
+            for ticker in ticker_list:
+                found = None
+                for symbol in symbol_candidates(ticker):
+                    try:
+                        url = f"https://stooq.com/q/l/?s={symbol.lower()}&f=sd2t2ohlcvn&e=csv"
+                        response = requests.get(url, timeout=8)
+                        response.raise_for_status()
+                        reader = csv.DictReader(response.text.splitlines())
+                        row = next(reader, None)
+                        if not row:
+                            continue
+
+                        close_str = str(row.get("Close", "")).strip()
+                        open_str = str(row.get("Open", "")).strip()
+                        if close_str in {"", "N/D"}:
+                            continue
+
+                        close_value = float(close_str)
+                        change_pct = 0.0
+                        if open_str not in {"", "N/D"}:
+                            open_value = float(open_str)
+                            if open_value > 0:
+                                change_pct = ((close_value / open_value) - 1.0) * 100.0
+
+                        found = {
+                            "ticker": ticker,
+                            "symbol_used": symbol,
+                            "last_price": close_value,
+                            "change_pct_1d": round(change_pct, 2),
+                            "source": "stooq",
+                            "as_of_utc": now_iso,
+                        }
+                        break
+                    except Exception:
+                        continue
+
+                if found:
+                    quotes.append(found)
+                else:
+                    errors.append(f"{ticker}: kein Live-Quote gefunden")
+
+            payload = {"as_of_utc": now_iso, "quotes": quotes, "errors": errors}
+            return json.dumps(payload, indent=2, ensure_ascii=False)
+        except Exception as e:
+            return f"Fehler beim Abrufen von Live-Aktiendaten: {e}"
+
+
+# =============================================================================
+# 13. CURRENT NEWS TOOL
+# =============================================================================
+
+class CurrentNewsTool(BaseTool):
+    """Sucht aktuelle Nachrichten (RSS) zu einem Thema oder Ticker."""
+    name: str = "Aktuelle News suchen"
+    description: str = (
+        "Sucht aktuelle News via Google News RSS. "
+        "Eingabe: Suchbegriff als String (z.B. 'NVIDIA Aktie')."
+    )
+
+    def _run(self, query: str) -> str:
+        try:
+            import requests
+        except ImportError:
+            return "Fehler: 'requests' Paket nicht installiert."
+
+        try:
+            from urllib.parse import quote_plus
+
+            q = (query or "").strip()
+            if not q:
+                return "⚠️ Kein Suchbegriff uebergeben."
+
+            url = f"https://news.google.com/rss/search?q={quote_plus(q)}&hl=de&gl=DE&ceid=DE:de"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            xml = response.text
+
+            items = re.findall(r"<item>(.*?)</item>", xml, flags=re.DOTALL | re.IGNORECASE)
+            if not items:
+                return f"Keine News gefunden fuer: {q}"
+
+            out = []
+            for item in items[:5]:
+                title_match = re.search(r"<title>(.*?)</title>", item, flags=re.DOTALL | re.IGNORECASE)
+                link_match = re.search(r"<link>(.*?)</link>", item, flags=re.DOTALL | re.IGNORECASE)
+                pub_match = re.search(r"<pubDate>(.*?)</pubDate>", item, flags=re.DOTALL | re.IGNORECASE)
+
+                title = re.sub(r"\s+", " ", title_match.group(1)).strip() if title_match else "(ohne Titel)"
+                link = link_match.group(1).strip() if link_match else ""
+                pub = pub_match.group(1).strip() if pub_match else "unbekannt"
+
+                out.append({"title": title, "link": link, "published": pub})
+
+            payload = {
+                "query": q,
+                "source": "google_news_rss",
+                "items": out,
+            }
+            return json.dumps(payload, indent=2, ensure_ascii=False)
+        except Exception as e:
+            return f"Fehler bei News-Suche: {e}"
+
+
+# =============================================================================
+# 14. VISUALIZATION TOOL
+# =============================================================================
+
+class VisualizationTool(BaseTool):
+    """Erstellt einfache Charts (bar/line/pie) aus JSON-Daten."""
+    name: str = "Visualisierung erstellen"
+    description: str = (
+        "Erstellt ein PNG-Chart aus JSON-Eingaben. "
+        "Eingabe: JSON-String mit chart_type ('bar'|'line'|'pie'), "
+        "labels (Liste), values (Liste), title (optional), output_path (optional)."
+    )
+
+    def _run(self, payload: str) -> str:
+        try:
+            data = json.loads(payload)
+        except Exception as e:
+            return f"⚠️ Ungueltiges JSON fuer Visualization Tool: {e}"
+
+        chart_type = str(data.get("chart_type", "bar")).lower()
+        labels = data.get("labels", [])
+        values = data.get("values", [])
+        title = data.get("title", "Visualisierung")
+        output_path = data.get(
+            "output_path",
+            "workshops/crewai_intro/outputs/visualization_chart.png",
+        )
+
+        if not isinstance(labels, list) or not isinstance(values, list):
+            return "⚠️ 'labels' und 'values' muessen Listen sein."
+        if not labels or len(labels) != len(values):
+            return "⚠️ 'labels' und 'values' muessen gleich lang und nicht leer sein."
+
+        numeric_values = []
+        for value in values:
+            try:
+                numeric_values.append(float(value))
+            except Exception:
+                return f"⚠️ Ungueltiger Zahlenwert in values: {value}"
+
+        dangerous = ["/etc", "/usr", "/bin", "/sbin", "/var", "/System"]
+        if any(str(output_path).startswith(d) for d in dangerous):
+            return f"⚠️ Schreiben in '{output_path}' ist nicht erlaubt."
+
+        try:
+            os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "matplotlib-cache"))
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+        except ImportError:
+            return "Fehler: 'matplotlib' Paket nicht installiert."
+
+        try:
+            os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+            fig, ax = plt.subplots(figsize=(9, 4))
+
+            if chart_type == "line":
+                ax.plot(labels, numeric_values, marker="o", color="#2E86AB")
+                ax.set_ylabel("Wert")
+            elif chart_type == "pie":
+                ax.clear()
+                ax.pie(numeric_values, labels=labels, autopct="%1.1f%%", startangle=100)
+            else:
+                ax.bar(labels, numeric_values, color="#2E86AB")
+                ax.set_ylabel("Wert")
+
+            ax.set_title(title)
+            if chart_type in {"bar", "line"}:
+                ax.set_ylim(bottom=0)
+                ax.grid(axis="y", linestyle="--", alpha=0.3)
+            fig.tight_layout()
+            fig.savefig(output_path, dpi=160)
+            plt.close(fig)
+            return f"✅ Visualisierung gespeichert: '{output_path}'"
+        except Exception as e:
+            return f"Fehler beim Erstellen des Charts: {e}"
+
+
+# =============================================================================
 # 📦 TOOL-INSTANZEN (bereit zur Verwendung)
 # =============================================================================
 
@@ -528,8 +688,12 @@ datetime_tool = DateTimeTool()
 json_formatter_tool = JSONFormatterTool()
 text_summarizer_tool = TextSummarizerTool()
 directory_list_tool = DirectoryListTool()
-shell_command_tool = ShellCommandTool()
 python_repl_tool = PythonREPLTool()
+live_stock_data_tool = LiveStockDataTool()
+current_news_tool = CurrentNewsTool()
+visualization_tool = VisualizationTool()
+# Rueckwaertskompatibler Alias
+portfolio_plot_tool = visualization_tool
 
 # Alle Tools in einer Liste (praktisch für Agenten, die "alles können" sollen)
 ALL_TOOLS = [
@@ -543,12 +707,14 @@ ALL_TOOLS = [
     json_formatter_tool,
     text_summarizer_tool,
     directory_list_tool,
-    shell_command_tool,
     python_repl_tool,
+    live_stock_data_tool,
+    current_news_tool,
+    visualization_tool,
 ]
 
 # Gruppierte Tool-Sets für verschiedene Anwendungsfälle
-RESEARCH_TOOLS = [rag_search_tool, wikipedia_tool, web_scraper_tool]
+RESEARCH_TOOLS = [rag_search_tool, wikipedia_tool, web_scraper_tool, live_stock_data_tool, current_news_tool]
 FILE_TOOLS = [file_reader_tool, file_writer_tool, directory_list_tool]
-UTILITY_TOOLS = [math_tool, datetime_tool, json_formatter_tool, text_summarizer_tool]
-DEVELOPER_TOOLS = [shell_command_tool, python_repl_tool, file_reader_tool, file_writer_tool]
+UTILITY_TOOLS = [math_tool, datetime_tool, json_formatter_tool, text_summarizer_tool, visualization_tool]
+DEVELOPER_TOOLS = [python_repl_tool, file_reader_tool, file_writer_tool]

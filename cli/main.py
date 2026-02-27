@@ -64,6 +64,15 @@ def query(
     typer.echo(f"Querying ({mode}) for: {question}")
 
     try:
+        response = control.query(
+            question=question,
+            use_rag=use_rag,
+            stream=stream,
+            backend=backend,
+            model=model,
+            max_new_tokens=max_tokens,
+        )
+
         if stream:
             typer.echo("Answer: ", nl=False)
             for chunk in pipeline.stream_query(question, use_rag=use_rag):
