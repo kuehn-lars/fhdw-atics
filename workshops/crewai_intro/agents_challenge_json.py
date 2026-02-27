@@ -44,7 +44,6 @@ from workshops.crewai_intro.tools import (
     json_formatter_tool,
     text_summarizer_tool,
     directory_list_tool,
-    shell_command_tool,
     python_repl_tool,
     # Gruppierte Tool-Sets
     ALL_TOOLS,
@@ -77,17 +76,15 @@ werden. Die Tools sind in `workshops/crewai_intro/tools.py` definiert.
 │ JSONFormatterTool      │ json_formatter_tool │ Formatiert Text als JSON           │
 │ TextSummarizerTool     │ text_summarizer_tool│ Kürzt Texte auf n Zeichen          │
 │ DirectoryListTool      │ directory_list_tool │ Listet Dateien in Verzeichnissen   │
-│ ShellCommandTool       │ shell_command_tool  │ Führt sichere Shell-Befehle aus    │
 │ PythonREPLTool         │ python_repl_tool    │ Führt Python-Code aus (Sandbox)    │
 └────────────────────────┴─────────────────────┴────────────────────────────────────┘
 
 TOOL-SETS (Gruppierungen für verschiedene Anwendungsfälle):
-
     RESEARCH_TOOLS  = [rag_search_tool, wikipedia_tool, web_scraper_tool]
     FILE_TOOLS      = [file_reader_tool, file_writer_tool, directory_list_tool]
     UTILITY_TOOLS   = [math_tool, datetime_tool, json_formatter_tool, text_summarizer_tool]
-    DEVELOPER_TOOLS = [shell_command_tool, python_repl_tool, file_reader_tool, file_writer_tool]
-    ALL_TOOLS       = [alle 12 Tools]
+    DEVELOPER_TOOLS = [python_repl_tool, file_reader_tool, file_writer_tool]
+    ALL_TOOLS       = [alle 11 Tools]
 """
 
 
@@ -339,10 +336,6 @@ crew = Crew(
     # ─── HIERARCHICAL MODE ──────────────────────────────────────────
     manager_llm=...,            # LLM für den Manager (nur bei hierarchical)
     manager_agent=...,          # Eigener Manager-Agent (statt auto-generiert)
-    
-    # ─── CALLBACKS ──────────────────────────────────────────────────
-    step_callback=...,          # Nach jedem Agent-Schritt
-    task_callback=...,          # Nach jeder Task-Completion
 )
 
 
@@ -406,60 +399,7 @@ ERGEBNIS-ZUGRIFF
 -----------------
 
 result = crew.kickoff()
-
-# Zugriff auf das finale Ergebnis:
-print(result)                           # Der gesamte Output als String
-print(result.raw)                       # Roher Text-Output
-print(result.pydantic)                  # Pydantic-Objekt (wenn output_pydantic gesetzt)
-print(result.pydantic.model_dump())     # Als Python-Dict
-print(result.pydantic.model_dump_json())# Als JSON-String
-
-# Zugriff auf einzelne Task-Ergebnisse:
-task1.output.raw_output                 # Roher Output von Task 1
-task2.output.raw_output                 # Roher Output von Task 2
-
-# Zugriff auf Token-Nutzung:
-result.token_usage                      # Dict mit Token-Verbrauch pro Agent
 """
-
-
-# =============================================================================
-# 📝 TEIL 6: CALLBACKS & LOGGING
-# =============================================================================
-
-execution_logs = []
-
-def step_callback(step_output):
-    """
-    Wird NACH JEDEM SCHRITT eines Agenten aufgerufen.
-    Nützlich für: Logging, Monitoring, Debugging, Frontend-Updates.
-    """
-    execution_logs.append({
-        "type": "step",
-        "details": str(step_output)
-    })
-    print(f"  📌 Step: {str(step_output)[:100]}")
-
-
-def task_callback(task_output):
-    """
-    Wird NACH ABSCHLUSS EINES TASKS aufgerufen.
-    Nützlich für: Progress-Tracking, Zwischenergebnisse speichern.
-    """
-    execution_logs.append({
-        "type": "task_complete",
-        "output": str(task_output)[:500]
-    })
-    print(f"  ✅ Task abgeschlossen!")
-
-
-# Verwendung in der Crew:
-# crew = Crew(
-#     agents=[...],
-#     tasks=[...],
-#     step_callback=step_callback,
-#     task_callback=task_callback,
-# )
 
 
 # =============================================================================
@@ -497,26 +437,6 @@ HÄUFIGE FEHLER & LÖSUNGEN
 7. ❌ Tasks laufen in falscher Reihenfolge
    → `context=[vorheriger_task]` explizit setzen
    → Oder `Process.sequential` verwenden
-
-
-PERFORMANCE-TIPPS
------------------
-
-1. 🚀 Kleine LLMs für einfache Tasks
-   → Nicht jeder Agent braucht das größte Modell
-   → Tool-Calls: kleines Modell oft ausreichend (function_calling_llm=...)
-
-2. 🚀 Module Caching
-   → Schwere Module (ChromaDB, Embeddings) nur einmal laden
-   → Siehe `_module_cache` in agents_router.py
-
-3. 🚀 Tool-Sets statt ALL_TOOLS
-   → Gib Agenten nur die Tools, die sie brauchen
-   → Weniger Tools = weniger Verwirrung für das LLM
-
-4. 🚀 max_iter begrenzen
-   → Standard ist 15, für einfache Tasks reichen 5-10
-   → Verhindert endlose Schleifen
 """
 
 
