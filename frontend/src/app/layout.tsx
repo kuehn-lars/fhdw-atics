@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
-
 export const metadata: Metadata = {
-  title: "FHDW Atics",
-  description: "LLM Chatbot with RAG Capabilities",
+  title: "Atics | AI Platform",
+  description: "Next Generation Agentic Workspace",
 };
 
 export default function RootLayout({
@@ -16,7 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className="dark">
-      <body className={`${inter.className} bg-[#131314] text-[#E3E3E3] antialiased`}>
+      <body className="antialiased min-h-screen">
         {children}
       </body>
     </html>
