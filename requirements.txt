@@ -17,3 +17,5 @@ torch>=2.2.0
 bitsandbytes>=0.43.0
 pytest>=8.0.0
 python-multipart>=0.0.9
+crewai>=1.10.1
+crawai-tools>=1.10.1
