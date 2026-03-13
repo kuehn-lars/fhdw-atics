@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # Model Selection
     openai_model: str = "gpt-3.5-turbo"
-    local_model: str = "qwen3:4b"
+    local_model: str = "qwen2.5:0.5b"
     embeddings_model: str = "qwen2.5:0.5b"
     nvidia_model: str = "meta/llama-3.2-3b-instruct"
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     vector_db_path: str = "./chroma_db"
     # Documents Path
     documents_path: str = "./documents"
-    
+
     model_config = SettingsConfigDict(env_file=".env")
 
 
