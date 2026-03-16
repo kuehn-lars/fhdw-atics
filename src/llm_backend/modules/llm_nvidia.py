@@ -7,9 +7,18 @@ from src.rag_system.core.base import LLMInterface
 
 class NVIDIAModule(LLMInterface):
     def __init__(
-        self, api_key: str, model_name: str = "meta/llama-3.2-3b-instruct"
+        self, api_key: str, model_name: str = "qwen/qwen3.5-122b-a10b"
     ):
-        self.llm = ChatNVIDIA(nvidia_api_key=api_key, model=model_name)
+        # Update to support NVIDIA NIM API structure
+        self.llm = ChatNVIDIA(
+            nvidia_api_key=api_key, 
+            model=model_name,
+            base_url="https://integrate.api.nvidia.com/v1",
+            max_tokens=16384,
+            temperature=0.6,
+            top_p=0.95,
+            extra_body={"chat_template_kwargs": {"enable_thinking": True}}
+        )
 
     def generate(
         self,
