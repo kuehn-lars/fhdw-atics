@@ -27,7 +27,7 @@ Output Format (NDJSON – ein JSON pro Zeile):
 import os
 
 # ── Disable ALL CrewAI / OpenTelemetry / Posthog telemetry ──────────────────
-# Must happen BEFORE any `from crewai import ...` (triggered by challenge modules)
+# Must happen BEFORE any `from crewai_toy import ...` (triggered by challenge modules)
 os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
 os.environ["OTEL_SDK_DISABLED"] = "true"
 os.environ["POSTHOG_DISABLED"] = "true"
@@ -45,7 +45,16 @@ import importlib.util
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
+from pydantic import BaseModel
+
 router = APIRouter(prefix="/agents", tags=["Agents"])
+
+# ── Pydantic-Modelle für die Challenge-Inputs ──────────────────────────────
+class Challenge1Request(BaseModel):
+    THEMA: str = "Was ist RAG?"
+    KAPITAL_EUR: float = 2000.0
+    RISIKO_PROFIL: str = "Low Risk"
+    ANLAGE_HORIZONT: str = "10 Jahre"
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _WORKSHOPS_DIR = os.path.join(_ROOT, "workshops", "crewai_intro")
@@ -106,34 +115,88 @@ def _get_module(filename: str):
     return _module_cache[filename]
 
 
-def _worker(mod, fn_name: str, q: queue.Queue):
+def _worker(mod, fn_name: str, q: queue.Queue, kwargs: dict = None):
     """
-    Background-Thread: führt mod.<fn_name>(mod.CHALLENGE_INPUT) aus.
+    Background-Thread: führt mod.<fn_name>(**kwargs) aus.
     stdout → Queue (JSON log-Objekte).
     """
     original_stdout = sys.stdout
     sys.stdout = _QueueWriter(q, original_stdout)
     try:
         fn = getattr(mod, fn_name)
-        challenge_input = getattr(mod, "CHALLENGE_INPUT", "Keine Frage konfiguriert")
-        result = fn(challenge_input)
+        # Fallback für verschiedene Varianten des Inputs
+        challenge_input = getattr(mod, "CHALLENGE_INPUT", getattr(mod, "SUCHE_THEMA", "Keine Frage konfiguriert"))
+        
+        # Prüfen, ob die Funktion Argumente akzeptiert
+        import inspect
+        sig = inspect.signature(fn)
+        has_kwargs = any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values())
+        param_names = list(sig.parameters.keys())
+
+        if kwargs:
+            # Mappe THEMA auf thema, KAPITAL_EUR auf kapital_eur etc. für die Musterlösung
+            mapped_kwargs = {
+                "THEMA": kwargs.get("THEMA"),
+                "SUCHE_THEMA": kwargs.get("THEMA"),
+                "suche_thema": kwargs.get("THEMA"),
+                "topic": kwargs.get("THEMA"),
+                "KAPITAL_EUR": kwargs.get("KAPITAL_EUR"),
+                "kapital": kwargs.get("KAPITAL_EUR"),
+                "RISIKO_PROFIL": kwargs.get("RISIKO_PROFIL"),
+                "risiko": kwargs.get("RISIKO_PROFIL"),
+                "ANLAGE_HORIZONT": kwargs.get("ANLAGE_HORIZONT"),
+                "horizont": kwargs.get("ANLAGE_HORIZONT")
+            }
+            # lower_mapped für Funktionsargumente
+            lower_mapped = {
+                "thema": kwargs.get("THEMA"),
+                "kapital_eur": kwargs.get("KAPITAL_EUR"),
+                "risiko_profil": kwargs.get("RISIKO_PROFIL"),
+                "anlage_horizont": kwargs.get("ANLAGE_HORIZONT")
+            }
+            
+            # 1. Versuche, globale Variablen im Modul zu überschreiben
+            for key, val in mapped_kwargs.items():
+                if val is not None:
+                    setattr(mod, key, val)
+            
+            # 2. Funktionsaufruf mit passenden Argumenten
+            if has_kwargs:
+                final_kwargs = {k: v for k, v in lower_mapped.items() if v is not None}
+                result = fn(**final_kwargs)
+            elif param_names:
+                # Nur übergeben, was die Funktion auch annimmt
+                final_kwargs = {k: v for k, v in lower_mapped.items() if k in param_names and v is not None}
+                result = fn(**final_kwargs)
+            else:
+                # Keine Parameter -> global überschriebene Variablen ziehen
+                result = fn()
+        elif len(sig.parameters) > 0:
+            result = fn(challenge_input)
+        else:
+            result = fn()
+            
         q.put(_ndjson({"type": "result", "answer": str(result)}))
     except Exception as exc:
+        import traceback
+        traceback.print_exc() # Auch im Server-Log zeigen
         q.put(_ndjson({"type": "error", "message": str(exc)}))
     finally:
         sys.stdout = original_stdout
         q.put(None)  # Sentinel: Generator stoppt hier
 
 
-def _make_endpoint(filename: str, fn_name: str = "run_challenge"):
+def _make_endpoint(filename: str, fn_name: str = "run_challenge", request_data: dict = None):
     """Factory: erzeugt einen Route-Handler für eine Challenge-Datei."""
 
     async def endpoint():
         mod = _get_module(filename)
-        challenge_input = getattr(mod, "CHALLENGE_INPUT", "?")
+        # Wenn request_data da ist, THEMA bevorzugen, sonst Fallback
+        challenge_input = (request_data.get("THEMA") if request_data else None) or \
+                         getattr(mod, "CHALLENGE_INPUT", getattr(mod, "SUCHE_THEMA", "?"))
 
         q: queue.Queue = queue.Queue()
-        thread = threading.Thread(target=_worker, args=(mod, fn_name, q), daemon=True)
+        thread = threading.Thread(target=_worker, args=(mod, fn_name, q, request_data), daemon=True)
         thread.start()
 
         loop = asyncio.get_running_loop()
@@ -157,21 +220,11 @@ def _make_endpoint(filename: str, fn_name: str = "run_challenge"):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Endpoints  (kein Request-Body – Konfiguration im jeweiligen Skript)
+# Endpoints  (Konfiguration per Request-Body)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post("/challenge1", summary="Challenge 1 – Researcher + Writer")
-async def challenge1():
-    return await _make_endpoint("agents_challenge1.py")()
-
-
-@router.post("/challenge2", summary="Challenge 2 – Researcher + Writer")
-async def challenge2():
-    return await _make_endpoint("agents_challenge2.py")()
-
-
-@router.post("/challenge3", summary="Challenge 3 – Researcher + Writer")
-async def challenge3():
-    return await _make_endpoint("agents_challenge3.py")()
+@router.post("/challenge1", summary="Challenge 1 – Investment Portfolio Audit")
+async def challenge1(request: Challenge1Request):
+    return await _make_endpoint("AC1_Musterlösung.py", "run_v33_master_pipeline", request.dict())()
 
 

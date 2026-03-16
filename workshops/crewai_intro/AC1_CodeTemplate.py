@@ -32,7 +32,7 @@ from src.llm_backend.crew_factory import get_crew_llm
 load_dotenv()
 os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
 
-from crewai import Agent, Crew, Task, LLM, Process
+from crewai_toy import Agent, Crew, Task, LLM, Process
 from crewai.tools import BaseTool
 
 
