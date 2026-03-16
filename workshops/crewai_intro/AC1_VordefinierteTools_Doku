@@ -1,0 +1,4 @@
+| Tool                       | Input                                                   | Output                                                              | Semantischer Sinn                                                                  |
+| -------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `BulkFinancialTool`        | `tickers: List[str]`                                    | JSON-Liste mit Finanzkennzahlen je Ticker                           | Liefert fundamentale Finanzdaten zur quantitativen Validierung von Aktienideen.    |
+| `InstitutionalNewsScanner` | `query: str`                                            | Liste aktueller Artikel plus lokales `news_archive.json`            | Sucht aktuelle Nachrichten und Katalysatoren zu Unternehmen, Sektoren oder Themen. |

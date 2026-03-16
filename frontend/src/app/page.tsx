@@ -35,7 +35,7 @@ const CustomMarkdown = {
 
 export default function CleanChatApp() {
   const [viewMode, setViewMode] = useState<'chat' | 'challenge'>('chat');
-  const [sessions, setSessions] = useState<{id: string, title: string, messages: any[]}[]>([
+  const [sessions, setSessions] = useState<{ id: string, title: string, messages: any[] }[]>([
     { id: "default", title: "Neue Unterhaltung", messages: [] }
   ]);
   const [currentSessionId, setCurrentSessionId] = useState("default");
@@ -47,8 +47,8 @@ export default function CleanChatApp() {
 
   // Challenge States
   const [challengeStatus, setChallengeStatus] = useState<string[]>([]);
-  const [researcherMsgs, setResearcherMsgs] = useState<string[]>([]);
-  const [writerMsgs, setWriterMsgs] = useState<string[]>([]);
+  const [agentLogs, setAgentLogs] = useState<Record<string, string[]>>({});
+  const [finalResult, setFinalResult] = useState<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isAutoScrollRef = useRef(true);
@@ -60,8 +60,8 @@ export default function CleanChatApp() {
   const handleSelectChallenge = (id: number) => {
     if (selectedChallenge !== id) {
       setChallengeStatus([]);
-      setResearcherMsgs([]);
-      setWriterMsgs([]);
+      setAgentLogs({});
+      setFinalResult(null);
     }
     setSelectedChallenge(id);
     setViewMode('challenge');
@@ -109,10 +109,10 @@ export default function CleanChatApp() {
     setSessions(prev => prev.map(s =>
       s.id === currentSessionId
         ? {
-            ...s,
-            messages: [...s.messages, { role: "user", content: userQuery }, { role: "assistant", content: "" }],
-            title: s.messages.length === 0 ? (userQuery.substring(0, 24) + "...") : s.title
-          }
+          ...s,
+          messages: [...s.messages, { role: "user", content: userQuery }, { role: "assistant", content: "" }],
+          title: s.messages.length === 0 ? (userQuery.substring(0, 24) + "...") : s.title
+        }
         : s
     ));
 
@@ -147,8 +147,8 @@ export default function CleanChatApp() {
     if (!selectedChallenge) return;
     setIsLoading(true);
     setChallengeStatus(["Initializing neural agents..."]);
-    setResearcherMsgs([]);
-    setWriterMsgs([]);
+    setAgentLogs({});
+    setFinalResult(null);
 
     try {
       const resp = await fetch(`http://127.0.0.1:8000/agents/challenge${selectedChallenge}`, { method: "POST" });
@@ -168,16 +168,27 @@ export default function CleanChatApp() {
           try {
             const obj = JSON.parse(line);
             const content = formatResponse(obj.message || obj.text || obj.answer || "");
-            if (obj.type === 'status') setChallengeStatus(p => [...p, content]);
-            else if (obj.type === 'log') {
-              if (content.toLowerCase().includes('research')) setResearcherMsgs(p => [...p, content]);
-              else if (content.toLowerCase().includes('writer')) setWriterMsgs(p => [...p, content]);
-              else setChallengeStatus(p => [...p, content]);
+
+            if (obj.type === 'status') {
+              setChallengeStatus(p => [...p, content]);
+            } else if (obj.type === 'log') {
+              // Extrahiere Agenten-Name: [Agent Name] ...
+              const agentMatch = content.match(/^\[Agent\s+([^\]]+)\]/i) || content.match(/^\[([^\]]+)\]/i);
+
+              if (agentMatch) {
+                const agentName = agentMatch[1].trim();
+                setAgentLogs(prev => ({
+                  ...prev,
+                  [agentName]: [...(prev[agentName] || []), content.replace(agentMatch[0], "").trim()]
+                }));
+              } else {
+                setChallengeStatus(p => [...p, content]);
+              }
             } else if (obj.type === 'result') {
-                setWriterMsgs(p => [...p, content]);
-                setChallengeStatus(p => [...p, "Workflow completed successfully."]);
+              setFinalResult(content);
+              setChallengeStatus(p => [...p, "Workflow completed successfully."]);
             }
-          } catch(e) {}
+          } catch (e) { }
         }
       }
     } catch (e) { setChallengeStatus(p => [...p, "System error occurred..."]); } finally { setIsLoading(false); }
@@ -187,7 +198,7 @@ export default function CleanChatApp() {
     <div className="flex h-screen w-full relative overflow-hidden bg-[#050505] text-zinc-200 font-sans">
       {/* Dynamic Background */}
       <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[140px] animate-pulse pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-emerald-600/10 rounded-full blur-[140px] animate-pulse pointer-events-none" style={{animationDelay: '2s'}} />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-emerald-600/10 rounded-full blur-[140px] animate-pulse pointer-events-none" style={{ animationDelay: '2s' }} />
 
       {/* SIDEBAR */}
       <aside className={`z-50 flex flex-col transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] border-r border-white/5 bg-black/20 backdrop-blur-xl ${isSidebarOpen ? 'w-72' : 'w-0 overflow-hidden'}`}>
@@ -236,24 +247,24 @@ export default function CleanChatApp() {
             </button>
             <div className="h-6 w-px bg-white/10" />
             <div className="flex flex-col">
-               <div className="flex items-center gap-2">
-                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                 <span className="text-[10px] font-black tracking-[0.4em] text-zinc-500 uppercase">
-                   {viewMode === 'chat' ? 'LLM Chat Mode' : 'Agent Challenge Environment'}
-                 </span>
-               </div>
-               <span className="text-sm font-bold text-white tracking-tight">{viewMode === 'chat' ? activeSession.title : `Agent Challenge 0${selectedChallenge}`}</span>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black tracking-[0.4em] text-zinc-500 uppercase">
+                  {viewMode === 'chat' ? 'LLM Chat Mode' : 'Agent Challenge Environment'}
+                </span>
+              </div>
+              <span className="text-sm font-bold text-white tracking-tight">{viewMode === 'chat' ? activeSession.title : `Agent Challenge 0${selectedChallenge}`}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-             <div className="hidden md:flex flex-col items-end mr-4">
-                <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">System Status</span>
-                <span className="text-[11px] text-emerald-400 font-mono">Running</span>
-             </div>
-             <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-zinc-400">
-                <Command size={18} />
-             </div>
+            <div className="hidden md:flex flex-col items-end mr-4">
+              <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">System Status</span>
+              <span className="text-[11px] text-emerald-400 font-mono">Running</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-zinc-400">
+              <Command size={18} />
+            </div>
           </div>
         </header>
 
@@ -264,10 +275,10 @@ export default function CleanChatApp() {
                 {activeSession.messages.length === 0 ? (
                   <div className="h-[65vh] flex flex-col items-center justify-center text-center">
                     <div className="relative mb-10">
-                        <div className="absolute inset-0 bg-blue-500/20 blur-[40px] animate-pulse rounded-full" />
-                        <div className="relative w-24 h-24 rounded-[2rem] bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center border border-white/20 shadow-2xl">
-                          <Sparkles className="text-blue-400" size={44} strokeWidth={1.5} />
-                        </div>
+                      <div className="absolute inset-0 bg-blue-500/20 blur-[40px] animate-pulse rounded-full" />
+                      <div className="relative w-24 h-24 rounded-[2rem] bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center border border-white/20 shadow-2xl">
+                        <Sparkles className="text-blue-400" size={44} strokeWidth={1.5} />
+                      </div>
                     </div>
                     <h2 className="text-5xl font-black text-white mb-4 tracking-tighter">Atics <span className="text-blue-500">Intelligence</span></h2>
                     <p className="text-zinc-500 text-sm max-w-sm leading-relaxed font-medium uppercase tracking-[0.1em]">
@@ -282,33 +293,32 @@ export default function CleanChatApp() {
                         {/* Avatar/Label for Assistant */}
                         {m.role === 'assistant' && (
                           <div className="flex items-center gap-3 mb-3 ml-1">
-                             <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/20">
-                               <Bot size={14} strokeWidth={2.5} />
-                             </div>
-                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400/80">Atics Antwort</span>
-                             {isLoading && i === activeSession.messages.length - 1 && (
-                               <div className="flex gap-1 ml-2">
-                                 <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{animationDelay: '0ms'}} />
-                                 <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{animationDelay: '150ms'}} />
-                                 <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{animationDelay: '300ms'}} />
-                               </div>
-                             )}
+                            <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/20">
+                              <Bot size={14} strokeWidth={2.5} />
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400/80">Atics Antwort</span>
+                            {isLoading && i === activeSession.messages.length - 1 && (
+                              <div className="flex gap-1 ml-2">
+                                <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                              </div>
+                            )}
                           </div>
                         )}
 
-                        <div className={`relative p-6 md:p-8 rounded-[2rem] transition-all duration-300 ${
-                          m.role === 'user'
-                          ? 'bg-white text-black font-semibold shadow-[0_20px_40px_rgba(255,255,255,0.05)] border-t border-white/20'
-                          : 'bg-white/5 border border-white/10 backdrop-blur-md shadow-2xl border-l-4 border-l-blue-500'
-                        }`}>
+                        <div className={`relative p-6 md:p-8 rounded-[2rem] transition-all duration-300 ${m.role === 'user'
+                            ? 'bg-white text-black font-semibold shadow-[0_20px_40px_rgba(255,255,255,0.05)] border-t border-white/20'
+                            : 'bg-white/5 border border-white/10 backdrop-blur-md shadow-2xl border-l-4 border-l-blue-500'
+                          }`}>
                           {m.role === 'user' ? (
                             <div className="flex items-start gap-4">
-                               <p className="flex-1 leading-relaxed">{m.content}</p>
-                               <User size={18} className="mt-1 opacity-40" />
+                              <p className="flex-1 leading-relaxed">{m.content}</p>
+                              <User size={18} className="mt-1 opacity-40" />
                             </div>
                           ) : (
                             <div className="prose prose-invert prose-sm max-w-none">
-                               <ReactMarkdown components={CustomMarkdown} remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                              <ReactMarkdown components={CustomMarkdown} remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
                             </div>
                           )}
                         </div>
@@ -397,13 +407,13 @@ export default function CleanChatApp() {
                 <div className="p-6 font-mono text-[11px] space-y-4 overflow-y-auto flex-1 hide-scrollbar bg-black/40">
                   {challengeStatus.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-zinc-700 italic gap-2">
-                       <div className="w-12 h-1 bg-white/5 rounded-full" />
-                       Ready for deployment
+                      <div className="w-12 h-1 bg-white/5 rounded-full" />
+                      Ready for deployment
                     </div>
                   )}
                   {challengeStatus.map((s, i) => (
                     <div key={i} className="text-zinc-400 flex gap-3 leading-relaxed animate-in slide-in-from-left-2 duration-300">
-                      <span className="text-blue-500/50 font-bold shrink-0">[{new Date().toLocaleTimeString([], {hour12:false, second: '2-digit'})}]</span>
+                      <span className="text-blue-500/50 font-bold shrink-0">[{new Date().toLocaleTimeString([], { hour12: false, second: '2-digit' })}]</span>
                       <span className="break-words font-medium">{s}</span>
                     </div>
                   ))}
@@ -412,54 +422,53 @@ export default function CleanChatApp() {
 
               {/* AGENT OUTPUTS */}
               <div className="col-span-8 space-y-8 overflow-y-auto hide-scrollbar pb-10">
-                {/* Researcher Card */}
-                <div className="glass-card rounded-[2.5rem] p-10 border-l-8 border-l-blue-500 shadow-2xl animate-in slide-in-from-right-4 duration-500 relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 p-10 opacity-[0.03] group-hover:scale-110 transition-transform duration-700"><Search size={120} /></div>
-                   <div className="flex items-center gap-5 mb-10">
-                      <div className="p-4 rounded-[1.5rem] bg-blue-500/20 text-blue-400 shadow-xl border border-blue-500/20">
-                        <Search size={28} strokeWidth={2.5} />
+                <div className="grid grid-cols-1 gap-8">
+                  {Object.entries(agentLogs).map(([agentName, msgs], agentIdx) => (
+                    <div key={agentIdx} className="glass-card rounded-[2.5rem] p-10 border-l-8 border-l-blue-500 shadow-2xl animate-in slide-in-from-right-4 duration-500 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-10 opacity-[0.03] group-hover:scale-110 transition-transform duration-700">
+                        {agentName.toLowerCase().includes('writer') ? <PenTool size={120} /> : <Search size={120} />}
                       </div>
-                      <div>
-                        <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-blue-400 mb-1">Agent Interface</h3>
-                        <p className="text-xl font-bold text-white tracking-tight">Deep Researcher</p>
+                      <div className="flex items-center gap-5 mb-10">
+                        <div className={`p-4 rounded-[1.5rem] shadow-xl border ${agentName.toLowerCase().includes('writer') ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' : 'bg-blue-500/20 text-blue-400 border-blue-500/20'}`}>
+                          {agentName.toLowerCase().includes('writer') ? <PenTool size={28} strokeWidth={2.5} /> : <Search size={28} strokeWidth={2.5} />}
+                        </div>
+                        <div>
+                          <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] mb-1 ${agentName.toLowerCase().includes('writer') ? 'text-emerald-400' : 'text-blue-400'}`}>Agent Interface</h3>
+                          <p className="text-xl font-bold text-white tracking-tight">{agentName}</p>
+                        </div>
                       </div>
-                   </div>
-                   <div className="space-y-6">
-                      {researcherMsgs.length > 0 ? (
-                        researcherMsgs.map((m, i) => (
+                      <div className="space-y-6">
+                        {msgs.map((m, i) => (
                           <div key={i} className="bg-white/5 p-8 rounded-[2rem] border border-white/5 backdrop-blur-sm">
                             <ReactMarkdown components={CustomMarkdown}>{m}</ReactMarkdown>
                           </div>
-                        ))
-                      ) : (
-                        <div className="h-40 flex items-center justify-center border-2 border-dashed border-white/5 rounded-[2rem] text-zinc-600 font-bold uppercase tracking-widest text-[10px]">Awaiting Agent Data...</div>
-                      )}
-                   </div>
-                </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
 
-                {/* Writer Card */}
-                <div className="glass-card rounded-[2.5rem] p-10 border-l-8 border-l-emerald-500 shadow-2xl animate-in slide-in-from-right-4 duration-700 relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 p-10 opacity-[0.03] group-hover:scale-110 transition-transform duration-700"><PenTool size={120} /></div>
-                   <div className="flex items-center gap-5 mb-10">
-                      <div className="p-4 rounded-[1.5rem] bg-emerald-500/20 text-emerald-400 shadow-xl border border-emerald-500/20">
-                        <PenTool size={28} strokeWidth={2.5} />
+                  {/* Final Result Card */}
+                  {finalResult && (
+                    <div className="glass-card rounded-[2.5rem] p-10 border-l-8 border-l-purple-500 shadow-2xl animate-in slide-in-from-right-4 duration-700 relative overflow-hidden group bg-purple-500/5">
+                      <div className="absolute top-0 right-0 p-10 opacity-[0.03] group-hover:scale-110 transition-transform duration-700"><Activity size={120} /></div>
+                      <div className="flex items-center gap-5 mb-10">
+                        <div className="p-4 rounded-[1.5rem] bg-purple-500/20 text-purple-400 shadow-xl border border-purple-500/20">
+                          <Zap size={28} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                          <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-purple-400 mb-1">Mission Outcome</h3>
+                          <p className="text-xl font-bold text-white tracking-tight">Final Result</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-emerald-400 mb-1">Executive Interface</h3>
-                        <p className="text-xl font-bold text-white tracking-tight">Strategic Writer</p>
+                      <div className="bg-black/40 p-8 rounded-[2rem] border border-white/10 shadow-inner leading-relaxed overflow-x-auto">
+                        <ReactMarkdown components={CustomMarkdown}>{finalResult}</ReactMarkdown>
                       </div>
-                   </div>
-                   <div className="space-y-6">
-                      {writerMsgs.length > 0 ? (
-                        writerMsgs.map((m, i) => (
-                          <div key={i} className="bg-emerald-500/5 p-8 rounded-[2rem] border border-emerald-500/10 shadow-inner leading-relaxed">
-                            <ReactMarkdown components={CustomMarkdown}>{m}</ReactMarkdown>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="h-40 flex items-center justify-center border-2 border-dashed border-white/5 rounded-[2rem] text-zinc-600 font-bold uppercase tracking-widest text-[10px]">Awaiting Finalization...</div>
-                      )}
-                   </div>
+                    </div>
+                  )}
+
+                  {Object.keys(agentLogs).length === 0 && !finalResult && (
+                    <div className="h-40 flex items-center justify-center border-2 border-dashed border-white/5 rounded-[2rem] text-zinc-600 font-bold uppercase tracking-widest text-[10px]">Awaiting Agent Data...</div>
+                  )}
                 </div>
               </div>
             </div>
