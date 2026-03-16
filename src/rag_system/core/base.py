@@ -1,8 +1,11 @@
 import os
+
+from langchain_text_splitters import MarkdownHeaderTextSplitter
 from config.settings import settings
 from abc import ABC, abstractmethod
 from typing import Any, Iterator, List, Optional
 from langchain_ollama import OllamaEmbeddings
+from langchain_text_splitters import MarkdownTextSplitter
 from pydantic import BaseModel
 
 
@@ -11,14 +14,33 @@ class Document(BaseModel):
     metadata: dict = {}
 
 
-class DocumentLoader():
+class DocumentLoader:
     def load(self, source: str) -> List[Document]:
         list_of_docs = os.listdir(source)
         docs = []
+
         for doc in list_of_docs:
-            with open(os.path.join(source, doc), "r", encoding="utf-8") as f:
+            full_path = os.path.join(source, doc)
+
+            if not os.path.isfile(full_path):
+                continue
+
+            with open(full_path, "r", encoding="utf-8") as f:
                 content = f.read()
-                docs.append(Document(content=content, metadata={"source": doc}))
+
+            splitter = MarkdownHeaderTextSplitter(
+                headers_to_split_on=[("#", "h1"), ("##", "h2"), ("###", "h3")]
+            )
+            chunks = splitter.split_text(content)
+
+            for chunk in chunks:
+                docs.append(
+                    Document(
+                        content=chunk.page_content,
+                        metadata={"source": doc, **chunk.metadata}
+                    )
+                )
+
         return docs
 
 
@@ -65,5 +87,5 @@ class LLMInterface(ABC):
 if __name__ == "__main__":
     # Example usage
     loader = DocumentLoader()
-    docs = loader.load("../../../documents")
+    docs = loader.load(os.path.join(os.path.dirname(__file__), "../../../documents"))
     print(docs[0].content)
