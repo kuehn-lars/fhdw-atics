@@ -21,9 +21,10 @@ def get_crew_llm(backend: Optional[str] = None, model: Optional[str] = None) -> 
         if not settings.nvidia_api_key:
             raise ValueError("NVIDIA_API_KEY must be set in .env for NIM/NVIDIA mode.")
         
+        os.environ["NVIDIA_NIM_API_KEY"] = settings.nvidia_api_key
+        
         return LLM(
-            model=model or settings.nvidia_model,
-            base_url="https://integrate.api.nvidia.com/v1",
+            model=f"nvidia_nim/{model or settings.nvidia_model}",
             api_key=settings.nvidia_api_key,
             temperature=0.6,
             max_tokens=16384,

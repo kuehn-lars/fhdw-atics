@@ -35,6 +35,14 @@ app.add_middleware(
 # ── Agents SSE-Router (Challenge 1–4 + JSON) ───────────────────────────────
 app.include_router(agents_router)
 
+@app.get("/")
+async def root():
+    return {
+        "status": "online",
+        "message": "CrewAI Challenge API is running.",
+        "documentation": "/docs"
+    }
+
 
 # ── Bestehender RAG-Endpoint (unverändert) ────────────────────────────────
 class QueryRequest(BaseModel):

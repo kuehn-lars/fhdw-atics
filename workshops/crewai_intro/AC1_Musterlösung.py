@@ -31,6 +31,7 @@ from src.llm_backend.crew_factory import get_crew_llm
 
 load_dotenv()
 os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
 from crewai import Agent, Crew, Task, LLM, Process
 from crewai.tools import BaseTool
@@ -459,6 +460,12 @@ KAPITAL_EUR = 2_000.0
 RISIKO_PROFIL = "Low Risk" 
 ANLAGE_HORIZONT = "10 Jahre"
 MAX_SWARM_SIZE = 2
+
+# Aliases for internal consistency
+suche_thema = SUCHE_THEMA
+kapital = KAPITAL_EUR
+risiko = RISIKO_PROFIL
+horizont = ANLAGE_HORIZONT
 
 
 # ==========================================================
@@ -1053,7 +1060,7 @@ def run_v33_master_pipeline():
     discoverer = Agent(
         role="Head of Asset Sourcing & Public Equities Origination (Institutional IB / Buy-Side Standard)",
         goal=(
-            f"Identifiziere für das Investment-Thema '{SUCHE_THEMA}' jene börsennotierten Aktientitel, "
+            f"Identifiziere für das Investment-Thema '{suche_thema}' jene börsennotierten Aktientitel, "
             "bei denen die Wahrscheinlichkeit am höchsten ist, dass sie den ökonomischen Wert des Themas "
             "tatsächlich monetisieren und damit als investierbare Equity-Ideen in Frage kommen. "
         "Arbeite nicht wie eine Suchmaschine, sondern wie ein institutioneller Origination-Lead: "
@@ -1075,7 +1082,7 @@ def run_v33_master_pipeline():
         "strategische Schritte, die direkt dem Unternehmen zugeordnet werden können. "
         "Das Feld 'why_now' muss einen aktuellen oder zeitnah relevanten Trigger benennen; ein bloßer "
         "Langfristtrend ohne konkreten Timing-Aspekt genügt nicht. "
-        f"Berücksichtige explizit das Mandat '{RISIKO_PROFIL}' bei einem Anlagehorizont von '{ANLAGE_HORIZONT}'. "
+        f"Berücksichtige explizit das Mandat '{risiko}' bei einem Anlagehorizont von '{horizont}'."
         "Bei einem langfristigen Horizont darfst du kurzfristige Zyklik, temporär schwache Wachstumsphasen "
         "oder zwischenzeitliche Bewertungsvolatilität tolerieren, sofern die mehrjährige Monetarisierungslogik, "
         "die thematische Reinheit und der strukturelle Moat stark sind. "
@@ -1135,7 +1142,7 @@ def run_v33_master_pipeline():
             "Interpretiere Kennzahlen sektorsensitiv und nicht mechanisch. Eine hohe Verschuldung, ein Current Ratio "
             "unter 1.0 oder ein negatives Wachstumsprofil sind nicht automatisch kritisch, sondern im Kontext des "
             "Geschäftsmodells, der Kapitalintensität, der Zyklik und der Branchenstruktur zu bewerten. "
-            f"Berücksichtige explizit das Mandat '{RISIKO_PROFIL}' bei einem Anlagehorizont von '{ANLAGE_HORIZONT}'. "
+            f"Berücksichtige explizit das Mandat '{risiko}' bei einem Anlagehorizont von '{horizont}'."
             "Bei einem High-Risk-Mandat mit langfristigem Horizont sind höhere Bewertung, höhere Volatilität und "
             "zwischenzeitliche Ergebnisschwankungen tolerierbarer als in einem konservativen Mandat, sofern "
             "Profit-Pool-Potenzial, langfristige Skalierbarkeit und thematische Durability stark sind. "
@@ -1166,7 +1173,7 @@ def run_v33_master_pipeline():
     strategist = Agent(
         role="Head of Sector Intelligence & Macro Strategy",
         goal=(
-            f"Erstelle für das Investment-Thema '{SUCHE_THEMA}' eine institutionelle Sector- und Macro-Intelligence-Synthese "
+            f"Erstelle für das Investment-Thema '{suche_thema}' eine institutionelle Sector- und Macro-Intelligence-Synthese "
             "auf Basis aktueller Nachrichten- und Signals-Lage. "
             "Deine Aufgabe ist es nicht, bloß viele Headlines zusammenzufassen, sondern aus der Nachrichtenlage die "
             "entscheidenden strukturellen Treiber, Nachfrageimpulse, regulatorischen Entwicklungen, geopolitischen "
@@ -1260,8 +1267,8 @@ def run_v33_master_pipeline():
     cio = Agent(
         role="Chief Investment Officer (CIO) – Final Portfolio Construction & Capital Allocation",
         goal=(
-            f"Baue das finale, thematisch saubere und risikobewusste Portfolio für '{SUCHE_THEMA}' und ein "
-            f"Gesamtkapital von {KAPITAL_EUR} EUR. "
+            f"Baue das finale, thematisch saubere und risikobewusste Portfolio für '{suche_thema}' und ein "
+            f"Gesamtkapital von {kapital} EUR. "
             "Du integrierst die Discovery-These, das Quant-Audit, den Makro-Rahmen, die Equity-Research-Deep-Dives "
             "und die Bear-Cases zu einer finalen Investitionsentscheidung. "
             "Du darfst nur Titel berücksichtigen, die im finalen Research-Briefing belastbar vertreten sind. "
@@ -1270,7 +1277,7 @@ def run_v33_master_pipeline():
             "Das Kelly-Tool dient dir als Orientierung für Positionsgrößen, aber du handelst nicht mechanisch; "
             "du musst Kelly, thematische Reinheit, Konzentrationsrisiko, Bear-Case-Schwere, Makro-Lage und "
             "institutionelle Plausibilität gemeinsam abwägen. "
-            f"Berücksichtige explizit das Mandat '{RISIKO_PROFIL}' bei einem Anlagehorizont von '{ANLAGE_HORIZONT}'. "
+            f"Berücksichtige explizit das Mandat '{risiko}' bei einem Anlagehorizont von '{horizont}'."
             "Bei einem High-Risk-Mandat mit langfristigem Horizont darf das finale Portfolio konzentrierter sein und höhere "
             "zwischenzeitliche Volatilität tolerieren, sofern die Titel einen starken langfristigen thematischen Hebel, "
             "robuste Moats und ein attraktives mehrjähriges Upside-Profil aufweisen. "
@@ -1624,7 +1631,7 @@ def run_v33_master_pipeline():
 
     t6 = Task(
         description=(
-            f"Baue das finale Portfolio für {KAPITAL_EUR} EUR auf Basis der bisherigen Pipeline.\n"
+            f"Baue das finale Portfolio für {kapital} EUR auf Basis der bisherigen Pipeline.\n"
             "\n"
             "ARBEITSAUFTRAG:\n"
             "1. Berücksichtige die Discovery-Ergebnisse aus Task 1, das Quant-Audit aus Task 2, "
